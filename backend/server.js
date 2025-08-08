@@ -1,15 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { initializeDatabase } = require('./database/database');
-const emailProcessor = require('./services/emailProcessor');
+const { connectToDatabase } = require('./database/mongodb');
+// const emailProcessor = require('./services/emailProcessor'); // TODO: Fix emailProcessor for MongoDB
 const propertyRoutes = require('./routes/properties');
+const authRoutes = require('./routes/auth');
 const cron = require('node-cron');
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3101;
 
 // Middleware
 app.use(cors());
@@ -17,9 +18,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Initialize database
-initializeDatabase();
+connectToDatabase();
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 
 // Health check endpoint
@@ -28,20 +30,22 @@ app.get('/api/health', (req, res) => {
 });
 
 // Schedule email processing (every 30 minutes)
-cron.schedule('*/30 * * * *', async () => {
-  console.log('Running scheduled email processing...');
-  try {
-    await emailProcessor.processEmails();
-  } catch (error) {
-    console.error('Error in scheduled email processing:', error);
-  }
-});
+// TODO: Re-enable after fixing emailProcessor for MongoDB
+// cron.schedule('*/30 * * * *', async () => {
+//   console.log('Running scheduled email processing...');
+//   try {
+//     await emailProcessor.processEmails();
+//   } catch (error) {
+//     console.error('Error in scheduled email processing:', error);
+//   }
+// });
 
 // Manual email processing endpoint
 app.post('/api/process-emails', async (req, res) => {
   try {
-    const results = await emailProcessor.processEmails();
-    res.json({ success: true, results });
+    // TODO: Fix emailProcessor for MongoDB
+    // const results = await emailProcessor.processEmails();
+    res.json({ success: true, message: 'Email processing temporarily disabled during migration to MongoDB' });
   } catch (error) {
     console.error('Error processing emails:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -51,9 +55,10 @@ app.post('/api/process-emails', async (req, res) => {
 // Add sample data endpoint
 app.post('/api/add-sample-data', async (req, res) => {
   try {
-    const { populateSampleData } = require('./sampleData');
-    await populateSampleData();
-    res.json({ success: true, message: 'Sample data added successfully' });
+    // TODO: Update sampleData for MongoDB
+    // const { populateSampleData } = require('./sampleData');
+    // await populateSampleData();
+    res.json({ success: true, message: 'Sample data temporarily disabled during migration to MongoDB' });
   } catch (error) {
     console.error('Error adding sample data:', error);
     res.status(500).json({ success: false, error: error.message });

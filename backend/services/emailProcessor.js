@@ -1,7 +1,8 @@
 const { google } = require('googleapis');
 const cheerio = require('cheerio');
 const { v4: uuidv4 } = require('uuid');
-const { query, run } = require('../database/database');
+const Property = require('../models/Property');
+const EmailLog = require('../models/EmailLog');
 
 class EmailProcessor {
   constructor() {

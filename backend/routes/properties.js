@@ -1,22 +1,25 @@
 const express = require('express');
-const { query, run } = require('../database/database');
+const Property = require('../models/Property');
 const router = express.Router();
 
 // Get all properties
 router.get('/', async (req, res) => {
   try {
-    const properties = await query(`
-      SELECT * FROM properties 
-      ORDER BY created_at DESC
-    `);
+    const { status, archived } = req.query;
+    let filter = {};
     
-    // Parse images JSON for each property
-    const formattedProperties = properties.map(property => ({
-      ...property,
-      images: JSON.parse(property.images || '[]')
-    }));
+    if (status) {
+      filter.status = status;
+    }
     
-    res.json(formattedProperties);
+    if (archived !== undefined) {
+      filter.archived = archived === 'true';
+    }
+    
+    const properties = await Property.find(filter)
+      .sort({ createdAt: -1 });
+    
+    res.json(properties);
   } catch (error) {
     console.error('Error fetching properties:', error);
     res.status(500).json({ error: 'Failed to fetch properties' });
@@ -26,17 +29,11 @@ router.get('/', async (req, res) => {
 // Get single property
 router.get('/:id', async (req, res) => {
   try {
-    const properties = await query(
-      'SELECT * FROM properties WHERE id = ?',
-      [req.params.id]
-    );
+    const property = await Property.findById(req.params.id);
     
-    if (properties.length === 0) {
+    if (!property) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    
-    const property = properties[0];
-    property.images = JSON.parse(property.images || '[]');
     
     res.json(property);
   } catch (error) {
@@ -53,20 +50,20 @@ router.put('/:id', async (req, res) => {
       square_feet, bedrooms, bathrooms, status
     } = req.body;
 
-    const sql = `
-      UPDATE properties SET 
-        title = ?, description = ?, price = ?, location = ?,
-        property_type = ?, square_feet = ?, bedrooms = ?, 
-        bathrooms = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `;
+    const property = await Property.findByIdAndUpdate(
+      req.params.id,
+      {
+        title, description, price, location, property_type,
+        square_feet, bedrooms, bathrooms, status
+      },
+      { new: true, runValidators: true }
+    );
 
-    await run(sql, [
-      title, description, price, location, property_type,
-      square_feet, bedrooms, bathrooms, status, req.params.id
-    ]);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
 
-    res.json({ success: true, message: 'Property updated successfully' });
+    res.json({ success: true, message: 'Property updated successfully', property });
   } catch (error) {
     console.error('Error updating property:', error);
     res.status(500).json({ error: 'Failed to update property' });
@@ -76,7 +73,12 @@ router.put('/:id', async (req, res) => {
 // Delete property
 router.delete('/:id', async (req, res) => {
   try {
-    await run('DELETE FROM properties WHERE id = ?', [req.params.id]);
+    const property = await Property.findByIdAndDelete(req.params.id);
+    
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    
     res.json({ success: true, message: 'Property deleted successfully' });
   } catch (error) {
     console.error('Error deleting property:', error);

@@ -1,0 +1,19 @@
+# docker-compose.override.yml for development
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm start
+    environment:
+      - REACT_APP_API_URL=http://localhost:3101/api
+      - CHOKIDAR_USEPOLLING=true
+      - PORT=3100

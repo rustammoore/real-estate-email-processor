@@ -1,0 +1,32 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install build dependencies for native modules
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    curl
+
+# Copy package files
+COPY backend/package*.json ./
+
+# Install dependencies (use npm install to avoid lock mismatches)
+RUN npm install --omit=dev
+
+# Copy backend source code
+COPY backend/ ./
+
+# Create database directory
+RUN mkdir -p database
+
+# Expose port
+EXPOSE 3101
+
+# Health check (only for production)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3101/api/health || exit 1
+
+# Start the application based on environment
+CMD if [ "$NODE_ENV" = "development" ]; then npm run dev; else node server.js; fi 
