@@ -1,5 +1,9 @@
 FROM node:20-alpine
 
+# Allow switching behavior based on environment at build-time and run-time
+ARG NODE_ENV=production
+ENV NODE_ENV=$NODE_ENV
+
 WORKDIR /app
 
 # Install build dependencies for native modules
@@ -12,8 +16,14 @@ RUN apk add --no-cache \
 # Copy package files
 COPY backend/package*.json ./
 
-# Install dependencies (use npm install to avoid lock mismatches)
-RUN npm install --omit=dev
+# Install dependencies
+# In development, include devDependencies (e.g., nodemon) for hot-reload
+# In production, omit dev dependencies for smaller image
+RUN if [ "$NODE_ENV" = "development" ]; then \
+      npm install; \
+    else \
+      npm install --omit=dev; \
+    fi
 
 # Copy backend source code
 COPY backend/ ./
