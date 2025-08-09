@@ -84,8 +84,9 @@ export const AuthProvider = ({ children }) => {
       if (token && api.isAuthenticated()) {
         try {
           const response = await api.getCurrentUser();
-          const user = response.data?.user || response.user;
-          
+          const payload = response?.data?.data || response?.data || {};
+          const user = payload.user || response?.data?.user;
+
           if (user) {
             dispatch({ type: AUTH_ACTIONS.SET_USER, payload: user });
             // Store user in localStorage for persistence
@@ -198,7 +199,8 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
       
       const response = await api.updateProfile(profileData);
-      const updatedUser = response.data?.user || response.user;
+      const payload = response?.data?.data || response?.data || {};
+      const updatedUser = payload.user || response?.data?.user;
       
       // Update stored user
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -236,11 +238,12 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
       
       const response = await api.updateEmailConfig(emailConfig);
+      const payload = response?.data?.data || response?.data || {};
       
       // Update the user with new email config status
       const updatedUser = {
         ...state.user,
-        emailConfig: response.data?.emailConfig || response.emailConfig
+        emailConfig: payload.emailConfig || response?.data?.emailConfig
       };
       
       localStorage.setItem('user', JSON.stringify(updatedUser));

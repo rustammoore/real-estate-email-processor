@@ -108,17 +108,17 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
   // Only show loading if we're in a registration process or if there's an authenticated user
   if (isLoading && (isSubmitting || isAuthenticated || user)) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
         <LoadingSpinner />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full relative z-10">
         {/* Card Container */}
-        <div className="bg-white/95 rounded-2xl shadow-2xl border border-white/20 p-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           
           {/* Back Button */}
           {onBackToHome && (
@@ -139,8 +139,8 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
           {/* Header Section */}
           <div className="text-center mb-8">
             {/* Logo/Icon */}
-            <div className="mx-auto mb-6 h-16 w-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto mb-6 h-16 w-16 bg-gray-100 rounded-xl flex items-center justify-center">
+              <svg className="h-8 w-8 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
@@ -154,28 +154,28 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
           </div>
 
           {/* Benefits Box */}
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4 mb-6">
-            <h3 className="text-sm font-semibold text-purple-900 mb-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">
               Why join us?
             </h3>
             <ul className="space-y-2">
               <li className="flex items-start">
-                <svg className="h-5 w-5 text-purple-600 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 text-gray-700 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-sm text-purple-700">Automated email processing saves hours</span>
+                <span className="text-sm text-gray-700">Automated email processing saves hours</span>
               </li>
               <li className="flex items-start">
-                <svg className="h-5 w-5 text-purple-600 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 text-gray-700 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-sm text-purple-700">Smart property management tools</span>
+                <span className="text-sm text-gray-700">Smart property management tools</span>
               </li>
               <li className="flex items-start">
-                <svg className="h-5 w-5 text-purple-600 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 text-gray-700 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-sm text-purple-700">Secure data isolation per user</span>
+                <span className="text-sm text-gray-700">Secure data isolation per user</span>
               </li>
             </ul>
           </div>
@@ -219,7 +219,7 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
                     required
                     value={formData.name}
                     onChange={handleChange}
-                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.name ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.name ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all`}
                     placeholder="Enter your full name"
                   />
                 </div>
@@ -249,7 +249,7 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.email ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.email ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all`}
                     placeholder="Enter your email"
                   />
                 </div>
@@ -279,7 +279,7 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.password ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.password ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all`}
                     placeholder="Create a password"
                   />
                 </div>
@@ -312,7 +312,7 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
                     required
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+                    className={`block w-full pl-10 pr-3 py-3 border ${validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'} rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all`}
                     placeholder="Confirm your password"
                   />
                 </div>
@@ -328,11 +328,8 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
               <button
                 type="submit"
                 disabled={!isFormValid || isSubmitting}
-                className={`relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg transition-all duration-200 
-                  ${(!isFormValid || isSubmitting) 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : 'hover:from-indigo-700 hover:to-purple-700 hover:shadow-xl hover:scale-[1.02]'
-                  }`}
+                className={`relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gray-900 transition-colors 
+                  ${(!isFormValid || isSubmitting) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black'}`}
               >
                 {isSubmitting ? (
                   <>
@@ -354,7 +351,7 @@ const Register = ({ onSwitchToLogin, onBackToHome }) => {
               <button
                 type="button"
                 onClick={onSwitchToLogin}
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
+                className="text-sm font-medium text-gray-900 hover:underline"
               >
                 Already have an account? <span className="font-semibold">Sign in</span>
               </button>

@@ -29,6 +29,6 @@ export const useArchivedCount = () => {
     count,
     loading,
     error,
-    fetchArchivedCount
+    refetch: fetchArchivedCount
   };
 };

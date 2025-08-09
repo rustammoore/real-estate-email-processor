@@ -1,5 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  safelist: [
+    // Dynamic paddings used via template string in components
+    'p-3',
+    'p-4',
+  ],
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
     "./public/index.html"

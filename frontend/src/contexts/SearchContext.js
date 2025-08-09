@@ -142,9 +142,6 @@ export const SearchProvider = ({ children }) => {
   const filterProperties = useCallback((properties) => {
     if (!properties) return [];
 
-    // Update dynamic fields from properties only when properties change
-    updateDynamicFields(properties);
-
     let filtered = [...properties];
 
     // Apply text search

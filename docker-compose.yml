@@ -57,18 +57,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # IMPORTANT: Use localhost:3101 for external access!
-        # React bakes this URL into the build at compile time.
-        # The browser needs to access the backend from outside Docker,
-        # so we must use localhost with the exposed port, not the internal hostname.
-        REACT_APP_API_URL: http://localhost:3101/api
+        # For production image builds served by nginx, prefer same-origin API via nginx proxy
+        # The nginx in the frontend container proxies /api to the backend service.
+        REACT_APP_API_URL: /api
     container_name: real-estate-frontend
     ports:
       - "3100:3100"
     environment:
       # This environment variable is not used by the built React app,
       # but kept for consistency and documentation
-      - REACT_APP_API_URL=http://localhost:3101/api
+      - REACT_APP_API_URL=/api
     volumes: []
       # Development volume mounting (uncomment for development)
       # - ./frontend:/app

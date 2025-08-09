@@ -1,29 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import PropertyCard from './PropertyCard';
 import PropertyGrid from './PropertyGrid';
 import LoadingSpinner from './ui/LoadingSpinner';
 import Toast from './ui/Toast';
 import { useSearch } from '../contexts/SearchContext';
 import api from '../services/api';
 import '../styles/FollowUps.css';
+import { Box, FormControlLabel, Switch } from '@mui/material';
 
 const FollowUps = () => {
   const [loading, setLoading] = useState(true);
+  const [allFollowUps, setAllFollowUps] = useState([]);
   const [followUpsDue, setFollowUpsDue] = useState([]);
   const [followUpsNotDue, setFollowUpsNotDue] = useState([]);
   const [counts, setCounts] = useState({ due: 0, notDue: 0, total: 0 });
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
-  const { searchQuery, filterProperties } = useSearch();
+  const { updateDynamicFields } = useSearch();
+
+  // Toggles: default shows only regular (non-archived, non-deleted)
+  const [showRegular, setShowRegular] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const loadFollowUps = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.fetchFollowUps();
-      setFollowUpsDue(data.followUpsDue || []);
-      setFollowUpsNotDue(data.followUpsNotDue || []);
-      setCounts(data.counts || { due: 0, notDue: 0, total: 0 });
+      // Fetch non-deleted and deleted to support toggles
+      const [normalProps, deletedProps] = await Promise.all([
+        api.getProperties({ page: 1, limit: 1000 }),
+        api.getDeletedProperties()
+      ]);
+
+      const combined = [...(normalProps || []), ...(deletedProps || [])];
+      const withFollowUps = combined.filter((p) => Boolean(p.followUpDate));
+      setAllFollowUps(withFollowUps);
     } catch (err) {
       console.error('Error loading follow-ups:', err);
       setError('Failed to load follow-ups');
@@ -35,6 +46,47 @@ const FollowUps = () => {
   useEffect(() => {
     loadFollowUps();
   }, []);
+
+  useEffect(() => {
+    // Recompute sections whenever toggles or source change
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const isDue = (p) => new Date(p.followUpDate) <= endOfToday;
+    const isUpcoming = (p) => new Date(p.followUpDate) > endOfToday;
+    const isRegular = (p) => !p.archived && !p.deleted;
+    const isArchived = (p) => p.archived && !p.deleted;
+    const isDeleted = (p) => p.deleted;
+
+    const selected = (allFollowUps || []).filter((p) =>
+      (showRegular && isRegular(p)) || (showArchived && isArchived(p)) || (showDeleted && isDeleted(p))
+    );
+
+    const due = selected.filter(isDue);
+    const upcoming = selected.filter(isUpcoming);
+
+    setFollowUpsDue(due);
+    setFollowUpsNotDue(upcoming);
+    setCounts({ due: due.length, notDue: upcoming.length, total: selected.length });
+
+    if (selected.length > 0) {
+      updateDynamicFields(selected);
+    }
+
+    // Persist counts and filters for global consumers (e.g., header badge)
+    try {
+      const countsPayload = { due: due.length, notDue: upcoming.length, total: selected.length };
+      const filtersPayload = { showRegular, showArchived, showDeleted };
+      sessionStorage.setItem('followUpCounts', JSON.stringify(countsPayload));
+      sessionStorage.setItem('followUpFilters', JSON.stringify(filtersPayload));
+      window.dispatchEvent(
+        new CustomEvent('followUpCountsChanged', { detail: { counts: countsPayload, filters: filtersPayload } })
+      );
+    } catch (_) {
+      // ignore storage issues
+    }
+  }, [allFollowUps, showRegular, showArchived, showDeleted, updateDynamicFields]);
 
   const handlePropertyUpdate = () => {
     loadFollowUps();
@@ -48,8 +100,8 @@ const FollowUps = () => {
   if (loading) return <LoadingSpinner />;
   if (error) return <div className="error-message">{error}</div>;
 
-  const filteredDue = filterProperties(followUpsDue);
-  const filteredNotDue = filterProperties(followUpsNotDue);
+  const filteredDue = followUpsDue;
+  const filteredNotDue = followUpsNotDue;
 
   return (
     <div className="follow-ups-container">
@@ -71,6 +123,22 @@ const FollowUps = () => {
         </div>
       </div>
 
+      {/* Toggle Row */}
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+        <FormControlLabel
+          control={<Switch size="small" checked={showRegular} onChange={(e) => setShowRegular(e.target.checked)} />}
+          label="Show Regular"
+        />
+        <FormControlLabel
+          control={<Switch size="small" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />}
+          label="Show Archived"
+        />
+        <FormControlLabel
+          control={<Switch size="small" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />}
+          label="Show Deleted"
+        />
+      </Box>
+
       {/* Follow-ups Due Section */}
       <div className="follow-up-section">
         <h2 className="section-title due-title">
@@ -87,6 +155,7 @@ const FollowUps = () => {
             showFollowUpBadge={true}
             onFollowUpRemoved={handleFollowUpRemoved}
             onUpdate={handlePropertyUpdate}
+            variant="outlined"
           />
         )}
       </div>
@@ -94,7 +163,7 @@ const FollowUps = () => {
       {/* Follow-ups Not Due Section */}
       <div className="follow-up-section">
         <h2 className="section-title upcoming-title">
-          Upcoming Follow-ups ({filteredNotDue.length})
+          Upcoming Follow-ups ({counts.notDue})
         </h2>
         {filteredNotDue.length === 0 ? (
           <div className="empty-state">
@@ -107,6 +176,7 @@ const FollowUps = () => {
             showFollowUpBadge={true}
             onFollowUpRemoved={handleFollowUpRemoved}
             onUpdate={handlePropertyUpdate}
+            variant="outlined"
           />
         )}
       </div>

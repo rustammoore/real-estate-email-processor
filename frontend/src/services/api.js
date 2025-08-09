@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3101/api';
+const DEFAULT_LIST_LIMIT = Number(process.env.REACT_APP_LIST_LIMIT || 1000);
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -46,9 +47,24 @@ client.interceptors.response.use(
 );
 
 // Properties API
-export const getProperties = async () => {
-  const response = await client.get('/properties');
-  return response.data;
+const normalizeListResponse = (data) => Array.isArray(data) ? data : (data?.items || []);
+
+const buildQuery = (params = {}) => {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
+  });
+  const queryString = search.toString();
+  return queryString ? `?${queryString}` : '';
+};
+
+export const getProperties = async (params = {}) => {
+  // Ensure reasonable defaults for dashboard and client-side filtering
+  const query = buildQuery({ page: params.page || 1, limit: params.limit || DEFAULT_LIST_LIMIT, ...params });
+  const response = await client.get(`/properties${query}`);
+  return normalizeListResponse(response.data);
 };
 
 export const getProperty = async (id) => {
@@ -66,80 +82,167 @@ export const deleteProperty = async (id) => {
   return response.data;
 };
 
-// Email processing API
+// Email processing API (disabled/stub)
 export const processEmails = async () => {
-  const response = await client.post('/process-emails');
-  return response.data;
+  // Backend endpoint was removed during MongoDB migration. Return a safe stub.
+  return { success: true, message: 'Email processing is currently disabled.' };
 };
 
 // Property interaction API
 export const toggleLike = async (id) => {
-  const response = await client.post(`/properties/${id}/like`);
-  return response.data;
+  // Fetch current to compute toggle
+  const current = await client.get(`/properties/${id}`);
+  const liked = !Boolean(current.data?.liked);
+  const response = await client.put(`/properties/${id}`, { liked });
+  return { ...response.data.property, message: liked ? 'Property liked' : 'Like removed' };
 };
 
 export const toggleLove = async (id) => {
-  const response = await client.post(`/properties/${id}/love`);
-  return response.data;
+  const current = await client.get(`/properties/${id}`);
+  const loved = !Boolean(current.data?.loved);
+  const response = await client.put(`/properties/${id}`, { loved });
+  return { ...response.data.property, message: loved ? 'Property loved' : 'Love removed' };
 };
 
 export const toggleArchive = async (id) => {
-  const response = await client.post(`/properties/${id}/archive`);
-  return response.data;
+  const current = await client.get(`/properties/${id}`);
+  const archived = !Boolean(current.data?.archived);
+  const response = await client.put(`/properties/${id}`, { archived });
+  return { ...response.data.property, message: archived ? 'Property archived' : 'Property unarchived' };
 };
 
 export const setRating = async (id, rating) => {
-  const response = await client.post(`/properties/${id}/rating`, { rating });
-  return response.data;
+  const response = await client.put(`/properties/${id}`, { rating });
+  return { ...response.data.property, message: 'Rating updated' };
 };
 
 // Archived properties API
 export const getArchivedProperties = async () => {
-  const response = await client.get('/properties?archived=true');
-  return response.data;
+  const response = await client.get(`/properties${buildQuery({ archived: true, page: 1, limit: DEFAULT_LIST_LIMIT })}`);
+  return normalizeListResponse(response.data);
 };
 
 export const getArchivedPropertiesCount = async () => {
-  const response = await client.get('/properties/archived/count');
-  return response.data;
+  const archived = await getArchivedProperties();
+  const count = Array.isArray(archived) ? archived.length : (archived?.count || 0);
+  return { count };
 };
 
 // Pending review properties API
 export const getPendingReviewProperties = async () => {
-  const response = await client.get('/properties?status=pending-review');
-  return response.data;
+  // Backend uses status 'pending'
+  const response = await client.get(`/properties${buildQuery({ status: 'pending', page: 1, limit: DEFAULT_LIST_LIMIT })}`);
+  return normalizeListResponse(response.data);
 };
 
 // Deleted properties API
 export const getDeletedProperties = async () => {
-  const response = await client.get('/properties?status=deleted');
-  return response.data;
+  // Ask backend specifically for deleted
+  const response = await client.get(`/properties${buildQuery({ deleted: true, page: 1, limit: DEFAULT_LIST_LIMIT })}`);
+  return normalizeListResponse(response.data);
+};
+
+// Follow-up API
+export const setFollowUp = async (id, daysFromNow) => {
+  const now = new Date();
+  const target = new Date(now);
+  target.setDate(target.getDate() + Number(daysFromNow || 0));
+  const payload = {
+    followUpDate: target.toISOString(),
+    followUpSet: now.toISOString(),
+    lastFollowUpDate: null
+  };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Follow-up set' };
+};
+
+export const setFollowUpDate = async (id, isoDateString) => {
+  const now = new Date();
+  const payload = {
+    followUpDate: new Date(isoDateString).toISOString(),
+    followUpSet: now.toISOString(),
+    lastFollowUpDate: null
+  };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Follow-up set' };
+};
+
+export const removeFollowUp = async (id) => {
+  const payload = { followUpDate: null, lastFollowUpDate: null };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Follow-up removed' };
+};
+
+export const markAsFollowedUp = async (id) => {
+  const payload = { lastFollowUpDate: new Date().toISOString() };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Marked as followed up' };
 };
 
 // Duplicate detection API
 export const recheckDuplicates = async () => {
-  const response = await client.post('/properties/recheck-duplicates');
+  // Not implemented server-side; return a friendly stub
+  return { success: false, message: 'Duplicate recheck is currently unavailable.' };
+};
+
+// Deleted properties management (client expectations)
+export const restoreProperty = async (id) => {
+  const response = await client.put(`/properties/${id}`, { deleted: false });
+  return { ...response.data.property, message: 'Property restored' };
+};
+
+export const permanentlyDeleteProperty = async (id) => {
+  const response = await client.delete(`/properties/${id}/permanent`);
   return response.data;
+};
+
+// Pending review actions (stubs)
+export const approveDuplicate = async (duplicateId, originalId) => {
+  // Backend endpoint not implemented yet.
+  // Minimal fallback: remove the duplicate so the list shrinks.
+  // When server support exists, this should merge data and delete the duplicate.
+  await permanentlyDeleteProperty(duplicateId);
+  return { success: true, message: 'Duplicate approved by removing the duplicate.' };
+};
+
+export const rejectDuplicate = async (id) => {
+  // As a minimal action, treat reject as deleting the duplicate
+  return permanentlyDeleteProperty(id);
+};
+
+export const getOriginalProperty = async (duplicateId) => {
+  // Step 1: fetch the duplicate to discover its original id
+  const duplicateResponse = await client.get(`/properties/${duplicateId}`);
+  const duplicate = duplicateResponse.data;
+
+  const originalId = duplicate?.duplicate_of?._id || duplicate?.duplicate_of;
+  if (!originalId) {
+    throw new Error('Original property is not linked to this duplicate.');
+  }
+
+  // Step 2: fetch the original property
+  const originalResponse = await client.get(`/properties/${originalId}`);
+  return originalResponse.data;
 };
 
 // Follow-ups API (computed client-side from all properties)
 export const fetchFollowUps = async () => {
-  const response = await client.get('/properties');
-  const properties = Array.isArray(response.data) ? response.data : [];
+  const properties = await getProperties();
 
   const now = new Date();
   // Normalize to end of today so anything earlier is considered due
   const endOfToday = new Date(now);
   endOfToday.setHours(23, 59, 59, 999);
 
-  const isActive = (p) => !p.archived && !p.deleted;
+  // Include archived items in follow-ups, exclude only deleted
+  const isEligible = (p) => !p.deleted;
   const hasFollowUp = (p) => Boolean(p.followUpDate);
 
   const followUpsDue = properties.filter(
-    (p) => isActive(p) && hasFollowUp(p) && new Date(p.followUpDate) <= endOfToday
+    (p) => isEligible(p) && hasFollowUp(p) && new Date(p.followUpDate) <= endOfToday
   );
   const followUpsNotDue = properties.filter(
-    (p) => isActive(p) && hasFollowUp(p) && new Date(p.followUpDate) > endOfToday
+    (p) => isEligible(p) && hasFollowUp(p) && new Date(p.followUpDate) > endOfToday
   );
 
   return {
@@ -177,6 +280,17 @@ const apiService = {
   getPendingReviewProperties,
   getDeletedProperties,
   recheckDuplicates,
+  setFollowUp,
+  setFollowUpDate,
+  removeFollowUp,
+  markAsFollowedUp,
+  // review & duplicates
+  approveDuplicate,
+  rejectDuplicate,
+  getOriginalProperty,
+  // deletion/restore helpers
+  restoreProperty,
+  permanentlyDeleteProperty,
   fetchFollowUps,
   // auth helpers for context
   setAuthToken,

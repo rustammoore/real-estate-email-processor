@@ -1,11 +1,14 @@
 const express = require('express');
 const Property = require('../models/Property');
+const { protect, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
 
-// Get all properties
-router.get('/', async (req, res) => {
+// Get all properties (optional auth) with pagination
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { status, archived } = req.query;
+    const { status, archived, deleted, page = 1, limit = 25 } = req.query;
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 25, 1), 100);
     let filter = {};
     
     if (status) {
@@ -16,20 +19,47 @@ router.get('/', async (req, res) => {
       filter.archived = archived === 'true';
     }
     
-    const properties = await Property.find(filter)
-      .sort({ createdAt: -1 });
+    // Exclude deleted by default unless explicitly requested
+    if (deleted !== undefined) {
+      filter.deleted = deleted === 'true';
+    } else {
+      filter.deleted = false;
+    }
     
-    res.json(properties);
+    const query = Property.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((parsedPage - 1) * parsedLimit)
+      .limit(parsedLimit)
+      .select('-__v')
+      .lean();
+
+    const [rawItems, total] = await Promise.all([
+      query,
+      Property.countDocuments(filter)
+    ]);
+
+    const items = rawItems.map((doc) => {
+      const { _id, ...rest } = doc;
+      return { id: String(_id || rest.id), ...rest };
+    });
+
+    res.json({
+      items,
+      page: parsedPage,
+      limit: parsedLimit,
+      total,
+      totalPages: Math.ceil(total / parsedLimit)
+    });
   } catch (error) {
     console.error('Error fetching properties:', error);
     res.status(500).json({ error: 'Failed to fetch properties' });
   }
 });
 
-// Get single property
-router.get('/:id', async (req, res) => {
+// Get single property (optional auth)
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const property = await Property.findById(req.params.id);
+    const property = await Property.findById(req.params.id).select('-__v');
     
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
@@ -42,20 +72,47 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update property
-router.put('/:id', async (req, res) => {
+// Update property (requires auth) with input filtering
+router.put('/:id', protect, async (req, res) => {
   try {
-    const {
-      title, description, price, location, property_type,
-      square_feet, bedrooms, bathrooms, status
-    } = req.body;
+    // Allow updates to both core fields and interaction/follow-up fields
+    const allowedFields = [
+      'title', 'description', 'price', 'location', 'property_type',
+      'square_feet', 'bedrooms', 'bathrooms', 'status',
+      'liked', 'loved', 'rating', 'archived', 'deleted',
+      'followUpDate', 'followUpSet', 'lastFollowUpDate'
+    ];
+
+    const update = {};
+    for (const field of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        update[field] = req.body[field];
+      }
+    }
+
+    // Basic server-side validation for rating and date formats
+    if (Object.prototype.hasOwnProperty.call(update, 'rating')) {
+      const rating = Number(update.rating);
+      if (!Number.isFinite(rating) || rating < 0 || rating > 10) {
+        return res.status(400).json({ error: 'Rating must be a number between 0 and 10' });
+      }
+      update.rating = rating;
+    }
+
+    const dateFields = ['followUpDate', 'followUpSet', 'lastFollowUpDate'];
+    for (const df of dateFields) {
+      if (Object.prototype.hasOwnProperty.call(update, df) && update[df] !== null) {
+        const dateValue = new Date(update[df]);
+        if (Number.isNaN(dateValue.getTime())) {
+          return res.status(400).json({ error: `${df} must be a valid date` });
+        }
+        update[df] = dateValue;
+      }
+    }
 
     const property = await Property.findByIdAndUpdate(
       req.params.id,
-      {
-        title, description, price, location, property_type,
-        square_feet, bedrooms, bathrooms, status
-      },
+      update,
       { new: true, runValidators: true }
     );
 
@@ -70,19 +127,40 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete property
-router.delete('/:id', async (req, res) => {
+// Delete property (requires auth)
+// Soft delete: mark as deleted
+router.delete('/:id', protect, async (req, res) => {
   try {
-    const property = await Property.findByIdAndDelete(req.params.id);
-    
+    const property = await Property.findByIdAndUpdate(
+      req.params.id,
+      { deleted: true },
+      { new: true }
+    );
+
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    
-    res.json({ success: true, message: 'Property deleted successfully' });
+
+    res.json({ success: true, message: 'Property moved to deleted', property });
   } catch (error) {
-    console.error('Error deleting property:', error);
+    console.error('Error soft-deleting property:', error);
     res.status(500).json({ error: 'Failed to delete property' });
+  }
+});
+
+// Permanent delete: actually remove document (requires auth)
+router.delete('/:id/permanent', protect, async (req, res) => {
+  try {
+    const property = await Property.findByIdAndDelete(req.params.id);
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    res.json({ success: true, message: 'Property permanently deleted' });
+  } catch (error) {
+    console.error('Error permanently deleting property:', error);
+    res.status(500).json({ error: 'Failed to permanently delete property' });
   }
 });
 

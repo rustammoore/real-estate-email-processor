@@ -35,11 +35,18 @@ function PendingReview() {
   const [message, setMessage] = useState('');
   const [compareDialog, setCompareDialog] = useState({ open: false, duplicate: null, original: null });
   const { fetchPendingReview } = usePendingReview();
-  const { filterProperties } = useSearch();
+  const { filterProperties, updateDynamicFields } = useSearch();
 
   useEffect(() => {
     fetchPendingProperties();
   }, []);
+
+  useEffect(() => {
+    // Update dynamic fields after pendingProperties changes (safe post-render)
+    if (pendingProperties && pendingProperties.length > 0) {
+      updateDynamicFields(pendingProperties);
+    }
+  }, [pendingProperties, updateDynamicFields]);
 
   const fetchPendingProperties = async () => {
     try {
@@ -182,7 +189,7 @@ function PendingReview() {
               variant="outlined"
               color="primary"
               startIcon={<EditIcon />}
-              onClick={() => navigate(`/edit-property/${property.id}`)}
+              onClick={() => navigate(`/properties/${property.id}?edit=1`)}
               sx={{ flex: 1, minWidth: 'fit-content' }}
             >
               Edit

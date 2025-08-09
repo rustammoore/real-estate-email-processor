@@ -46,17 +46,13 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
 
   const handleSetCustomFollowUp = async () => {
     if (!customDate) return;
-    
     try {
       setLoading(true);
-      const targetDate = new Date(customDate);
-      const now = new Date();
-      const diffTime = targetDate - now;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      await api.setFollowUp(property.id, diffDays);
+      // Persist exact date, including past dates
+      await api.setFollowUpDate(property.id, customDate);
       if (onFollowUpSet) {
-        onFollowUpSet(property.id, diffDays);
+        // For UI that expects days, we can pass 0 or compute if needed; refresh callbacks will refetch
+        onFollowUpSet(property.id, 0);
       }
       if (onUpdate) {
         onUpdate();

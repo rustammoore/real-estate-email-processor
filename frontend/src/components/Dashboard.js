@@ -25,11 +25,18 @@ function Dashboard() {
   const [message, setMessage] = useState('');
   const [showAllProperties, setShowAllProperties] = useState(false);
   const navigate = useNavigate();
-  const { filterProperties, searchState } = useSearch();
+  const { filterProperties, searchState, updateDynamicFields } = useSearch();
 
   useEffect(() => {
     fetchStats();
   }, []);
+
+  useEffect(() => {
+    // Keep dynamic fields updated from latest full property set
+    if (allProperties && allProperties.length > 0) {
+      updateDynamicFields(allProperties);
+    }
+  }, [allProperties, updateDynamicFields]);
 
   const fetchStats = async () => {
     try {

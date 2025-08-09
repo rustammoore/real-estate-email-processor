@@ -21,4 +21,6 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:3101/api
       - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - TAILWIND_MODE=watch
       - PORT=3100

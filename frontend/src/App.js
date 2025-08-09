@@ -17,12 +17,36 @@ import { useAuth } from './contexts/AuthContext';
 
 const theme = createTheme({
   palette: {
+    mode: 'light',
+    background: {
+      default: '#f5f5f5',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#111827',
+      secondary: '#6b7280',
+    },
     primary: {
-      main: '#1976d2',
+      main: '#111827',
+      contrastText: '#ffffff',
     },
-    secondary: {
-      main: '#dc004e',
-    },
+    divider: '#e5e7eb',
+  },
+  typography: {
+    fontFamily: [
+      '-apple-system',
+      'BlinkMacSystemFont',
+      'Segoe UI',
+      'Roboto',
+      'Oxygen',
+      'Ubuntu',
+      'Cantarell',
+      'Fira Sans',
+      'Droid Sans',
+      'Helvetica Neue',
+      'sans-serif',
+    ].join(','),
+    fontWeightMedium: 600,
   },
 });
 

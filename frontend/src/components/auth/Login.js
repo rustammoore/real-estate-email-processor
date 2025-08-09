@@ -53,17 +53,17 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
   // Only show loading if we're in a login process or if there's an authenticated user
   if (isLoading && (isSubmitting || isAuthenticated || user)) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
         <LoadingSpinner />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full relative z-10">
         {/* Card Container */}
-        <div className="bg-white/95 rounded-2xl shadow-2xl border border-white/20 p-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           
           {/* Back Button */}
           {onBackToHome && (
@@ -84,8 +84,8 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
           {/* Header Section */}
           <div className="text-center mb-8">
             {/* Logo/Icon */}
-            <div className="mx-auto mb-6 h-16 w-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto mb-6 h-16 w-16 bg-gray-100 rounded-xl flex items-center justify-center">
+              <svg className="h-8 w-8 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
               </svg>
@@ -100,16 +100,16 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
           </div>
 
           {/* Demo Credentials Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
             <div className="flex items-center mb-2">
-              <svg className="h-4 w-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="h-4 w-4 text-gray-700 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
-              <h3 className="text-sm font-semibold text-blue-900">
+              <h3 className="text-sm font-semibold text-gray-900">
                 Demo Credentials
               </h3>
             </div>
-            <div className="text-sm text-indigo-700">
+            <div className="text-sm text-gray-700">
               <div className="mb-1">
                 <strong>Email:</strong> sarah.johnson@example.com
               </div>
@@ -125,11 +125,11 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
                   password: 'Password123!'
                 });
               }}
-              className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
+              className="mt-2 px-3 py-1 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-black transition-colors"
             >
               Use Demo Credentials
             </button>
-            <p className="text-xs text-indigo-600 mt-2">
+            <p className="text-xs text-gray-600 mt-2">
               Note: You'll need to register this account first if it doesn't exist.
             </p>
           </div>
@@ -172,7 +172,7 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all"
                     placeholder="Enter your email"
                   />
                 </div>
@@ -196,7 +196,7 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm text-sm text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all"
                     placeholder="Enter your password"
                   />
                 </div>
@@ -207,11 +207,11 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
               <button
                 type="submit"
                 disabled={!isFormValid || isSubmitting}
-                className={`relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-lg transition-all duration-200 
-                  ${(!isFormValid || isSubmitting) 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : 'hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl hover:scale-[1.02]'
-                  }`}
+                className={`relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gray-900 transition-colors 
+                  ${(!isFormValid || isSubmitting)
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-black'}
+                  `}
               >
                 {isSubmitting ? (
                   <>
@@ -233,7 +233,7 @@ const Login = ({ onSwitchToRegister, onBackToHome }) => {
               <button
                 type="button"
                 onClick={onSwitchToRegister}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                className="text-sm font-medium text-gray-900 hover:underline"
               >
                 Don't have an account? <span className="font-semibold">Sign up</span>
               </button>

@@ -39,11 +39,17 @@ function DeletedProperties() {
   const navigate = useNavigate();
   const { fetchDeletedProperties: refreshDeletedProperties } = useDeletedProperties();
   const { fetchPendingReview } = usePendingReview();
-  const { filterProperties } = useSearch();
+  const { filterProperties, updateDynamicFields } = useSearch();
 
   useEffect(() => {
     fetchDeletedProperties();
   }, []);
+
+  useEffect(() => {
+    if (deletedProperties && deletedProperties.length > 0) {
+      updateDynamicFields(deletedProperties);
+    }
+  }, [deletedProperties, updateDynamicFields]);
 
   const fetchDeletedProperties = async () => {
     try {

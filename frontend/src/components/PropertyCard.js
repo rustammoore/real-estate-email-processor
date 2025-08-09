@@ -125,7 +125,7 @@ function PropertyCard({
           📧 {property.email_source}
         </p>
         <p className="text-xs text-gray-500">
-          📅 {formatDate(property.created_at)}
+          📅 {formatDate(property.createdAt)}
         </p>
       </div>
 
@@ -148,7 +148,7 @@ function PropertyCard({
             
             {/* Edit Button */}
             <button
-              onClick={() => navigate(`/edit-property/${property.id}`)}
+              onClick={() => navigate(`/properties/${property.id}?edit=1`)}
               title="Edit Property"
               className="w-8 h-8 bg-purple-500 hover:bg-purple-600 text-white rounded-md flex items-center justify-center transition-colors"
             >

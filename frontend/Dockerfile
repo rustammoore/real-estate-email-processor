@@ -13,8 +13,9 @@ RUN npm install
 COPY . .
 
 # Build the app with the correct API URL
+# Default to same-origin API so nginx can proxy /api to backend
 ARG REACT_APP_API_URL
-ENV REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:3101/api}
+ENV REACT_APP_API_URL=${REACT_APP_API_URL:-/api}
 
 # Build the app
 RUN npm run build

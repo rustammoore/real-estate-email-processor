@@ -56,7 +56,7 @@ React applications bake environment variables into the build at compile time. If
    frontend:
      build:
        args:
-         REACT_APP_API_URL: http://localhost:3101/real-estate-email-system-backend/api
+          REACT_APP_API_URL: /api
    ```
 
 2. Rebuild the frontend container:
@@ -156,7 +156,7 @@ React applications bake environment variables into the build at compile time. If
 **Debugging Steps:**
 1. Test backend health endpoint:
    ```bash
-   curl http://localhost:3101/real-estate-email-system-backend/api/health
+    curl http://localhost:3101/api/health
    ```
 
 2. Check backend logs:
