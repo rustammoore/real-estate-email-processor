@@ -15,6 +15,8 @@ import {
   DialogActions,
   Divider
 } from '@mui/material';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 import {
   CheckCircle as ApproveIcon,
   Cancel as RejectIcon,
@@ -34,6 +36,7 @@ function PendingReview() {
   const [pendingProperties, setPendingProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [showDeleted, setShowDeleted] = useState(false);
   const [compareDialog, setCompareDialog] = useState({ open: false, duplicate: null, original: null });
   const { fetchPendingReview } = usePendingReview();
   const { filterProperties, updateDynamicFields } = useSearch();
@@ -59,6 +62,11 @@ function PendingReview() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getVisiblePending = () => {
+    const base = showDeleted ? pendingProperties : pendingProperties.filter((p) => !p.deleted);
+    return filterProperties(base);
   };
 
   const handleApprove = async (duplicateId, originalId) => {
@@ -125,9 +133,16 @@ function PendingReview() {
         Pending Review Properties
       </Typography>
       
-      <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="textSecondary" sx={{ mb: 1 }}>
         These properties were detected as potential duplicates and require your review.
       </Typography>
+
+      <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <FormControlLabel
+          control={<Switch checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />}
+          label="Show Deleted"
+        />
+      </Box>
 
       {message && (
         <Alert severity={message.includes('Error') ? 'error' : 'success'} sx={{ mb: 2 }}>
@@ -141,12 +156,12 @@ function PendingReview() {
       {/* Results count */}
       <Box mb={2}>
         <Typography variant="body2" color="textSecondary">
-          {filterProperties(pendingProperties).length} {filterProperties(pendingProperties).length === 1 ? 'property' : 'properties'} found
+          {getVisiblePending().length} {getVisiblePending().length === 1 ? 'property' : 'properties'} found
         </Typography>
       </Box>
 
       <PropertyGrid 
-        properties={filterProperties(pendingProperties)}
+        properties={getVisiblePending()}
         loading={loading}
         emptyMessage="No properties pending review"
         showFollowUpBadge={true}
