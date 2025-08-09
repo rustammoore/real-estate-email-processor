@@ -9,6 +9,8 @@ export function CountsProvider({ children }) {
     pendingReview: 0,
     archived: 0,
     deleted: 0,
+    totalProperties: 0,
+    activeProperties: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,11 +41,17 @@ export function CountsProvider({ children }) {
       // For header/menu: pending review count excludes deleted by default
       const pendingVisible = Array.isArray(pendingAll) ? pendingAll.filter((p) => !p.deleted) : [];
 
+      const nonDeleted = Array.isArray(allProps) ? allProps : [];
+      const totalProperties = nonDeleted.length + (Array.isArray(deletedList) ? deletedList.length : 0);
+      const activeProperties = nonDeleted.filter((p) => !p.archived && p.status !== 'pending').length;
+
       setCounts({
         followUps: { due: due.length, notDue: notDue.length, total: withFollowUps.length },
         pendingReview: pendingVisible.length,
         archived: archivedResp?.count || 0,
         deleted: Array.isArray(deletedList) ? deletedList.length : 0,
+        totalProperties,
+        activeProperties,
       });
     } catch (err) {
       console.error('Error refreshing global counts:', err);

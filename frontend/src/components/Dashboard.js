@@ -92,16 +92,16 @@ function Dashboard() {
   const fetchStats = async () => {
     try {
       const properties = await api.getProperties();
-      const activeProperties = properties.filter(p => p.status === 'active');
+      const activeProperties = properties.filter(p => !p.archived && p.status !== 'pending');
       
       // Determine most recently changed properties by updatedAt (fallback to createdAt)
       const recentProperties = getRecentTop10(properties);
 
       setStats({
-        totalProperties: properties.length,
-        activeProperties: activeProperties.length,
+        totalProperties: counts?.totalProperties ?? properties.length,
+        activeProperties: counts?.activeProperties ?? activeProperties.length,
         pendingReviewCount: 0,
-        deletedPropertiesCount: 0,
+        deletedPropertiesCount: counts?.deleted ?? 0,
         recentProperties
       });
       setAllProperties(properties);
