@@ -23,6 +23,14 @@ export const useArchivedCount = () => {
 
   useEffect(() => {
     fetchArchivedCount();
+    // Update count instantly on any property update/delete
+    const handler = () => fetchArchivedCount();
+    window.addEventListener('property:updated', handler);
+    window.addEventListener('property:deleted', handler);
+    return () => {
+      window.removeEventListener('property:updated', handler);
+      window.removeEventListener('property:deleted', handler);
+    };
   }, []);
 
   return {

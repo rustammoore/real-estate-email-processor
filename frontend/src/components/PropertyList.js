@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
-  Box,
-  Button
+  Box
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useSearch } from '../contexts/SearchContext';
 import PropertyGrid from './PropertyGrid';
@@ -15,8 +13,7 @@ function PropertyList() {
   const { updateDynamicFields, filterProperties } = useSearch();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const navigate = useNavigate();
+  const [, setMessage] = useState('');
 
   useEffect(() => {
     fetchProperties();
@@ -73,9 +70,11 @@ function PropertyList() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Property Listings
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography variant="h5" sx={{ m: 0 }}>
+          Property Listings
+        </Typography>
+      </Box>
 
       {/* Centralized Search & Filters */}
       <Box sx={{ mb: 3 }}>

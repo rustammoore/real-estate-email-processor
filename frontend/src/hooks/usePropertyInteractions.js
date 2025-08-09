@@ -21,6 +21,13 @@ export const usePropertyInteractions = (property, onUpdate) => {
           ...result
         });
       }
+
+      // Broadcast update so other views (e.g., dashboard) can react immediately
+      try {
+        window.dispatchEvent(new CustomEvent('property:updated', { detail: { ...property, ...result } }));
+      } catch (_) {
+        // no-op
+      }
       
       return result;
     } catch (error) {
@@ -48,7 +55,7 @@ export const usePropertyInteractions = (property, onUpdate) => {
       if (onUpdate) {
         onUpdate({
           ...property,
-          rating: result.rating
+          ...result
         });
       }
       

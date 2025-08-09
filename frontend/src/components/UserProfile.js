@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import LoadingSpinner from './ui/LoadingSpinner';
+import PropertyPageLayout from './layout/PropertyPageLayout';
 
 // Icons as SVG components for better performance
 const UserIcon = () => (
@@ -43,6 +45,7 @@ const InfoIcon = () => (
 const UserProfile = () => {
   const { user, updateProfile, changePassword, updateEmailConfig, isLoading } = useAuth();
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('profile');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -184,28 +187,25 @@ const UserProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                <UserIcon />
-              </div>
-              <div className="text-white">
-                <h1 className="text-3xl font-bold">{user?.name || 'User Profile'}</h1>
-                <p className="text-blue-100 mt-1">{user?.email}</p>
-                {user?.agentProfile?.company && (
-                  <p className="text-blue-100 text-sm">{user.agentProfile.company}</p>
-                )}
-              </div>
-            </div>
+    <PropertyPageLayout title="Profile" onBack={() => navigate('/')}> 
+      {/* Header Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-gray-600">
+            <UserIcon />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">{user?.name || 'User Profile'}</h1>
+            {user?.email && <p className="text-sm text-gray-600">{user.email}</p>}
+            {user?.agentProfile?.company && (
+              <p className="text-xs text-gray-500">{user.agentProfile.company}</p>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="flex">
               {[
@@ -613,9 +613,8 @@ const UserProfile = () => {
               </div>
             )}
           </div>
-        </div>
       </div>
-    </div>
+    </PropertyPageLayout>
   );
 };
 

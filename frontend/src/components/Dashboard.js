@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BuildingOfficeIcon,
-  EnvelopeIcon,
   ArrowPathIcon,
   ClockIcon,
-  DocumentMagnifyingGlassIcon
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
 import api from '../services/api';
 import { useSearch } from '../contexts/SearchContext';
+import { useArchivedCount } from '../hooks/useArchivedCount';
+import { useFollowUpCount } from '../hooks/useFollowUpCount';
 
 function Dashboard() {
   const [stats, setStats] = useState({
@@ -21,14 +22,66 @@ function Dashboard() {
     recentProperties: []
   });
   const [allProperties, setAllProperties] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [showAllProperties, setShowAllProperties] = useState(false);
   const navigate = useNavigate();
   const { filterProperties, searchState, updateDynamicFields } = useSearch();
+  const { count: archivedCount } = useArchivedCount();
+  const { followUpCounts } = useFollowUpCount();
+
+  const sortPropertiesByRecentChange = (props = []) => {
+    return props
+      .slice()
+      .sort((a, b) => {
+        const bTime = new Date(b.updatedAt || b.createdAt).getTime();
+        const aTime = new Date(a.updatedAt || a.createdAt).getTime();
+        return bTime - aTime;
+      });
+  };
+
+  const getRecentTop10 = (props = []) => sortPropertiesByRecentChange(props).slice(0, 10);
 
   useEffect(() => {
     fetchStats();
+  }, []);
+
+  // Global listeners to reflect changes made from other pages (e.g., detail view)
+  useEffect(() => {
+    const onPropertyUpdated = (e) => {
+      const updated = e.detail;
+      if (!updated?.id) return;
+      setAllProperties(prev => {
+        const updatedAll = prev.some(p => p.id === updated.id)
+          ? prev.map(p => (p.id === updated.id ? { ...p, ...updated } : p))
+          : [updated, ...prev];
+        setStats(prevStats => ({
+          ...prevStats,
+          recentProperties: getRecentTop10(updatedAll)
+        }));
+        return updatedAll;
+      });
+    };
+
+    const onPropertyDeleted = (e) => {
+      const { id } = e.detail || {};
+      if (!id) return;
+      setAllProperties(prev => {
+        const updatedAll = prev.filter(p => p.id !== id);
+        setStats(prevStats => ({
+          ...prevStats,
+          totalProperties: Math.max(prevStats.totalProperties - 1, 0),
+          deletedPropertiesCount: prevStats.deletedPropertiesCount + 1,
+          recentProperties: getRecentTop10(updatedAll)
+        }));
+        return updatedAll;
+      });
+    };
+
+    window.addEventListener('property:updated', onPropertyUpdated);
+    window.addEventListener('property:deleted', onPropertyDeleted);
+    return () => {
+      window.removeEventListener('property:updated', onPropertyUpdated);
+      window.removeEventListener('property:deleted', onPropertyDeleted);
+    };
   }, []);
 
   useEffect(() => {
@@ -60,32 +113,19 @@ function Dashboard() {
       } catch (error) {
         console.error('Error fetching deleted properties count:', error);
       }
-      
+      // Determine most recently changed properties by updatedAt (fallback to createdAt)
+      const recentProperties = getRecentTop10(properties);
+
       setStats({
         totalProperties: properties.length,
         activeProperties: activeProperties.length,
         pendingReviewCount,
         deletedPropertiesCount,
-        recentProperties: properties.slice(0, 5)
+        recentProperties
       });
       setAllProperties(properties);
     } catch (error) {
       console.error('Error fetching stats:', error);
-    }
-  };
-
-  const handleProcessEmails = async () => {
-    setLoading(true);
-    setMessage('');
-    
-    try {
-      await api.processEmails();
-      setMessage('Emails processed successfully!');
-      fetchStats(); // Refresh stats
-    } catch (error) {
-      setMessage('Error processing emails: ' + error.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -97,23 +137,6 @@ function Dashboard() {
         fetchStats(); // Refresh stats
       } catch (error) {
         setMessage('Error deleting property: ' + error.message);
-      }
-    }
-  };
-
-  const handleRecheckDuplicates = async () => {
-    if (window.confirm('This will re-check all active properties for duplicates. Properties detected as duplicates will be moved to pending review. Continue?')) {
-      setLoading(true);
-      setMessage('');
-      
-      try {
-        const result = await api.recheckDuplicates();
-        setMessage(result.message);
-        fetchStats(); // Refresh stats
-      } catch (error) {
-        setMessage('Error rechecking duplicates: ' + error.message);
-      } finally {
-        setLoading(false);
       }
     }
   };
@@ -134,117 +157,94 @@ function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
         {/* Stats Cards */}
-        <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="bg-white rounded-lg shadow p-3">
           <div className="flex items-center">
-            <BuildingOfficeIcon className="w-5 h-5 text-blue-500 mr-3" />
+            <BuildingOfficeIcon className="w-4 h-4 text-blue-500 mr-2" />
             <div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-lg font-semibold text-gray-900 leading-tight">
                 {stats.totalProperties}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-[10px] text-gray-500">
                 Total Properties
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="bg-white rounded-lg shadow p-3">
           <div className="flex items-center">
-            <BuildingOfficeIcon className="w-5 h-5 text-green-500 mr-3" />
+            <BuildingOfficeIcon className="w-4 h-4 text-green-500 mr-2" />
             <div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-lg font-semibold text-gray-900 leading-tight">
                 {stats.activeProperties}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-[10px] text-gray-500">
                 Active Properties
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4">
+        {/* Follow Ups */}
+        <div className="bg-white rounded-lg shadow p-3">
           <div className="flex items-center">
-            <ClockIcon className="w-5 h-5 text-yellow-500 mr-3" />
+            <ClockIcon className="w-4 h-4 text-indigo-500 mr-2" />
             <div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-lg font-semibold text-gray-900 leading-tight">
+                {followUpCounts?.total || 0}
+              </div>
+              <div className="text-[10px] text-gray-500">
+                Follow Ups
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Review */}
+        <div className="bg-white rounded-lg shadow p-3">
+          <div className="flex items-center">
+            <ClockIcon className="w-4 h-4 text-yellow-500 mr-2" />
+            <div>
+              <div className="text-lg font-semibold text-gray-900 leading-tight">
                 {stats.pendingReviewCount}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-[10px] text-gray-500">
                 Pending Review
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4">
+        {/* Archived */}
+        <div className="bg-white rounded-lg shadow p-3">
           <div className="flex items-center">
-            <BuildingOfficeIcon className="w-5 h-5 text-red-500 mr-3" />
+            <ArchiveBoxIcon className="w-4 h-4 text-gray-700 mr-2" />
             <div>
-              <div className="text-2xl font-bold text-gray-900">
-                {stats.deletedPropertiesCount}
+              <div className="text-lg font-semibold text-gray-900 leading-tight">
+                {archivedCount || 0}
               </div>
-              <div className="text-xs text-gray-500">
-                Deleted Properties
+              <div className="text-[10px] text-gray-500">
+                Archived
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <button
-            onClick={handleProcessEmails}
-            disabled={loading}
-            className="w-full h-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md flex items-center justify-center gap-2 transition-colors text-sm font-medium"
-          >
-            <EnvelopeIcon className="w-4 h-4" />
-            {loading ? 'Processing...' : 'Process Emails'}
-          </button>
-        </div>
-      </div>
-
-      {/* Action Buttons Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <button
-            onClick={() => navigate('/pending-review')}
-            className="w-full h-20 border border-gray-300 hover:border-blue-500 hover:bg-blue-50 text-gray-700 hover:text-blue-700 rounded-md flex items-center justify-center gap-2 transition-all font-medium"
-          >
-            <ClockIcon className="w-5 h-5" />
-            Review Duplicates
-          </button>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <button
-            onClick={() => navigate('/deleted-properties')}
-            className="w-full h-20 border border-gray-300 hover:border-red-500 hover:bg-red-50 text-gray-700 hover:text-red-700 rounded-md flex items-center justify-center gap-2 transition-all font-medium"
-          >
-            <BuildingOfficeIcon className="w-5 h-5" />
-            View Deleted
-          </button>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <button
-            onClick={handleRecheckDuplicates}
-            disabled={loading}
-            className="w-full h-20 border border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-700 hover:text-green-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 rounded-md flex items-center justify-center gap-2 transition-all font-medium"
-          >
-            <ArrowPathIcon className="w-5 h-5" />
-            Recheck Duplicates
-          </button>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <button
-            onClick={() => setShowAllProperties(!showAllProperties)}
-            className="w-full h-20 border border-gray-300 hover:border-purple-500 hover:bg-purple-50 text-gray-700 hover:text-purple-700 rounded-md flex items-center justify-center gap-2 transition-all font-medium"
-          >
-            <DocumentMagnifyingGlassIcon className="w-5 h-5" />
-            {showAllProperties ? 'Hide' : 'Show'} All Properties
-          </button>
+        {/* Deleted */}
+        <div className="bg-white rounded-lg shadow p-3">
+          <div className="flex items-center">
+            <BuildingOfficeIcon className="w-4 h-4 text-red-500 mr-2" />
+            <div>
+              <div className="text-lg font-semibold text-gray-900 leading-tight">
+                {stats.deletedPropertiesCount}
+              </div>
+              <div className="text-[10px] text-gray-500">
+                Deleted Properties
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -298,52 +298,57 @@ function Dashboard() {
           onDelete={handleDelete}
           showFollowUpBadge={true}
           onFollowUpSet={(propertyId, days) => {
-            // Update the property in both lists
-            const updatedProperty = { ...allProperties.find(p => p.id === propertyId) };
-            if (updatedProperty) {
+            // Update the property in both lists and re-sort recent list
+            const existing = allProperties.find(p => p.id === propertyId);
+            if (existing) {
               const followUpDate = new Date();
               followUpDate.setDate(followUpDate.getDate() + days);
-              updatedProperty.followUpDate = followUpDate.toISOString();
-              
-              setStats(prevStats => ({
-                ...prevStats,
-                recentProperties: prevStats.recentProperties.map(p => 
-                  p.id === propertyId ? updatedProperty : p
-                )
-              }));
-              setAllProperties(prev => prev.map(p => 
-                p.id === propertyId ? updatedProperty : p
-              ));
+              const updatedProperty = { 
+                ...existing, 
+                followUpDate: followUpDate.toISOString(),
+                updatedAt: new Date().toISOString()
+              };
+
+              setAllProperties(prev => {
+                const updatedAll = prev.map(p => (p.id === propertyId ? updatedProperty : p));
+                setStats(prevStats => ({
+                  ...prevStats,
+                  recentProperties: getRecentTop10(updatedAll)
+                }));
+                return updatedAll;
+              });
             }
           }}
           onFollowUpRemoved={(propertyId) => {
-            // Update the property in both lists
-            const updatedProperty = { ...allProperties.find(p => p.id === propertyId) };
-            if (updatedProperty) {
-              updatedProperty.followUpDate = null;
-              
-              setStats(prevStats => ({
-                ...prevStats,
-                recentProperties: prevStats.recentProperties.map(p => 
-                  p.id === propertyId ? updatedProperty : p
-                )
-              }));
-              setAllProperties(prev => prev.map(p => 
-                p.id === propertyId ? updatedProperty : p
-              ));
+            // Update the property in both lists and re-sort recent list
+            const existing = allProperties.find(p => p.id === propertyId);
+            if (existing) {
+              const updatedProperty = { 
+                ...existing, 
+                followUpDate: null,
+                updatedAt: new Date().toISOString()
+              };
+
+              setAllProperties(prev => {
+                const updatedAll = prev.map(p => (p.id === propertyId ? updatedProperty : p));
+                setStats(prevStats => ({
+                  ...prevStats,
+                  recentProperties: getRecentTop10(updatedAll)
+                }));
+                return updatedAll;
+              });
             }
           }}
           onPropertyUpdate={(updatedProperty) => {
-            // Update the property in both lists
-            setStats(prevStats => ({
-              ...prevStats,
-              recentProperties: prevStats.recentProperties.map(p => 
-                p.id === updatedProperty.id ? updatedProperty : p
-              )
-            }));
-            setAllProperties(prev => prev.map(p => 
-              p.id === updatedProperty.id ? updatedProperty : p
-            ));
+            // Update the property in both lists and re-sort recent list
+            setAllProperties(prev => {
+              const updatedAll = prev.map(p => (p.id === updatedProperty.id ? updatedProperty : p));
+              setStats(prevStats => ({
+                ...prevStats,
+                recentProperties: getRecentTop10(updatedAll)
+              }));
+              return updatedAll;
+            });
           }}
           onUpdate={() => {
             fetchStats();

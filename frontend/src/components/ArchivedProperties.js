@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Typography,
@@ -10,10 +10,9 @@ import {
 } from '@mui/material';
 import {
   Unarchive as UnarchiveIcon,
-  Refresh as RefreshIcon,
-  ArrowBack as ArrowBackIcon
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import BackButton from './ui/BackButton';
 import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
 import { useArchivedProperties } from '../hooks/useArchivedProperties';
@@ -22,7 +21,6 @@ import { toggleArchive } from '../services/api';
 
 function ArchivedProperties() {
   const [message, setMessage] = useState('');
-  const navigate = useNavigate();
   const { archivedProperties, loading, fetchArchivedProperties } = useArchivedProperties();
   const { filterProperties } = useSearch();
 
@@ -40,23 +38,21 @@ function ArchivedProperties() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box display="flex" alignItems="center" mb={3}>
-        <Tooltip title="Back to Dashboard">
-          <IconButton 
-            onClick={() => navigate('/')}
-            sx={{ mr: 2 }}
+      <Box sx={{ mb: 3 }}>
+        <BackButton />
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h4" gutterBottom>
+            Archived Properties
+          </Typography>
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={fetchArchivedProperties}
+            variant="outlined"
+            size="small"
           >
-            <ArrowBackIcon />
-          </IconButton>
-        </Tooltip>
-        <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          Archived Properties
-        </Typography>
-        <Tooltip title="Refresh">
-          <IconButton onClick={fetchArchivedProperties}>
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
+            Refresh
+          </Button>
+        </Box>
       </Box>
 
       {message && (
@@ -69,11 +65,16 @@ function ArchivedProperties() {
         </Alert>
       )}
 
-      <Box mb={3}>
+      <Box mb={2}>
         <SearchFilter 
           properties={archivedProperties} 
           showAdvanced={true}
         />
+      </Box>
+      <Box mb={2}>
+        <Typography variant="body2" color="textSecondary">
+          {filteredProperties.length} archived {filteredProperties.length === 1 ? 'property' : 'properties'} found
+        </Typography>
       </Box>
 
       <PropertyGrid 
@@ -102,11 +103,7 @@ function ArchivedProperties() {
         showFollowUpBadge={false}
       />
 
-      <Box mt={3} textAlign="center">
-        <Typography variant="body2" color="textSecondary">
-          Showing {filteredProperties.length} archived properties
-        </Typography>
-      </Box>
+      
     </Container>
   );
 }

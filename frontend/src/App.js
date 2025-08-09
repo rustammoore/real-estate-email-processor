@@ -13,6 +13,7 @@ import FollowUps from './components/FollowUps';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AuthWrapper from './components/auth/AuthWrapper';
 import UserProfile from './components/UserProfile';
+import PropertyForm from './components/PropertyForm';
 import { useAuth } from './contexts/AuthContext';
 
 const theme = createTheme({
@@ -74,6 +75,14 @@ function AppShell() {
           element={
             <ProtectedRoute>
               <PropertyList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/properties/new"
+          element={
+            <ProtectedRoute>
+              <PropertyForm mode="create" />
             </ProtectedRoute>
           }
         />

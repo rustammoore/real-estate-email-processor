@@ -22,6 +22,14 @@ export const useDeletedCount = () => {
 
   useEffect(() => {
     refetch();
+    // Update instantly on delete/restore and any update that toggles deleted
+    const handler = () => refetch();
+    window.addEventListener('property:updated', handler);
+    window.addEventListener('property:deleted', handler);
+    return () => {
+      window.removeEventListener('property:updated', handler);
+      window.removeEventListener('property:deleted', handler);
+    };
   }, [refetch]);
 
   return { count, loading, error, refetch };

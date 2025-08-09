@@ -19,6 +19,7 @@ import {
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import BackButton from './ui/BackButton';
 import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
 import api from '../services/api';
@@ -174,14 +175,7 @@ function DeletedProperties() {
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ mb: 3 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/properties')}
-          size="small"
-          sx={{ mb: 1 }}
-        >
-          Back to Properties
-        </Button>
+        <BackButton />
         
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography variant="h4" gutterBottom>

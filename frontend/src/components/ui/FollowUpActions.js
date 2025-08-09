@@ -31,10 +31,13 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
   const handleSetFollowUp = async (days) => {
     try {
       setLoading(true);
-      await api.setFollowUp(property.id, days);
+      const updated = await api.setFollowUp(property.id, days);
       if (onFollowUpSet) {
         onFollowUpSet(property.id, days);
       }
+      try {
+        window.dispatchEvent(new CustomEvent('property:updated', { detail: updated }));
+      } catch (_) {}
       if (onUpdate) {
         onUpdate();
       }
@@ -51,11 +54,14 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
     try {
       setLoading(true);
       // Persist exact date, including past dates
-      await api.setFollowUpDate(property.id, customDate);
+      const updated = await api.setFollowUpDate(property.id, customDate);
       if (onFollowUpSet) {
         // For UI that expects days, we can pass 0 or compute if needed; refresh callbacks will refetch
         onFollowUpSet(property.id, 0);
       }
+      try {
+        window.dispatchEvent(new CustomEvent('property:updated', { detail: updated }));
+      } catch (_) {}
       if (onUpdate) {
         onUpdate();
       }
@@ -74,10 +80,13 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
     if (isNaN(days)) return;
     try {
       setLoading(true);
-      await api.setFollowUp(property.id, days);
+      const updated = await api.setFollowUp(property.id, days);
       if (onFollowUpSet) {
         onFollowUpSet(property.id, days);
       }
+      try {
+        window.dispatchEvent(new CustomEvent('property:updated', { detail: updated }));
+      } catch (_) {}
       if (onUpdate) {
         onUpdate();
       }
@@ -93,7 +102,10 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
   const handleMarkAsFollowedUp = async () => {
     try {
       setLoading(true);
-      await api.markAsFollowedUp(property.id);
+      const updated = await api.markAsFollowedUp(property.id);
+      try {
+        window.dispatchEvent(new CustomEvent('property:updated', { detail: updated }));
+      } catch (_) {}
       if (onUpdate) {
         onUpdate();
       }
@@ -108,10 +120,13 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
   const handleRemoveFollowUp = async () => {
     try {
       setLoading(true);
-      await api.removeFollowUp(property.id);
+      const updated = await api.removeFollowUp(property.id);
       if (onFollowUpRemoved) {
         onFollowUpRemoved(property.id);
       }
+      try {
+        window.dispatchEvent(new CustomEvent('property:updated', { detail: updated }));
+      } catch (_) {}
       if (onUpdate) {
         onUpdate();
       }

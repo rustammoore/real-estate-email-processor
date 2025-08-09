@@ -1,27 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Container,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  TextField,
-  Grid,
-  Box,
-  Chip,
-  ImageList,
-  ImageListItem,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Alert
-} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { Card, CardContent, Typography, Button, TextField, Grid, Box, Chip, ImageList, ImageListItem, FormControl, InputLabel, Select, MenuItem, Alert } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { EyeIcon, PencilIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import api from '../services/api';
+import PropertyPageLayout from './layout/PropertyPageLayout';
+import FollowUpActions from './ui/FollowUpActions';
+import PropertyActions from './ui/PropertyActions';
 
 function PropertyDetail() {
   const { id } = useParams();
@@ -32,10 +17,39 @@ function PropertyDetail() {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [message, setMessage] = useState('');
+  const [allProperties, setAllProperties] = useState([]);
+  const [prevId, setPrevId] = useState(null);
+  const [nextId, setNextId] = useState(null);
 
   useEffect(() => {
     fetchProperty();
   }, [id]);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const list = await api.getProperties();
+        // Sort by createdAt if available, newest first
+        const sorted = [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setAllProperties(sorted);
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchAll();
+  }, []);
+
+  useEffect(() => {
+    if (!allProperties || allProperties.length === 0) return;
+    const idx = allProperties.findIndex((p) => String(p.id) === String(id));
+    if (idx !== -1) {
+      setPrevId(idx < allProperties.length - 1 ? allProperties[idx + 1].id : null);
+      setNextId(idx > 0 ? allProperties[idx - 1].id : null);
+    } else {
+      setPrevId(null);
+      setNextId(null);
+    }
+  }, [allProperties, id]);
 
   // Enable edit mode when navigated with ?edit=1
   useEffect(() => {
@@ -70,9 +84,14 @@ function PropertyDetail() {
 
   const handleSave = async () => {
     try {
-      await api.updateProperty(id, formData);
+      const resp = await api.updateProperty(id, formData);
+      const updated = resp?.property || null;
       setMessage('Property updated successfully!');
       setEditing(false);
+      if (updated) {
+        // Broadcast update so dashboard and other views can react immediately
+        window.dispatchEvent(new CustomEvent('property:updated', { detail: updated }));
+      }
       fetchProperty(); // Refresh data
     } catch (error) {
       setMessage('Error updating property: ' + error.message);
@@ -83,10 +102,26 @@ function PropertyDetail() {
     if (window.confirm('Are you sure you want to delete this property?')) {
       try {
         await api.deleteProperty(id);
+        // Broadcast delete so dashboard and lists can react immediately
+        window.dispatchEvent(new CustomEvent('property:deleted', { detail: { id } }));
         navigate('/properties');
       } catch (error) {
         setMessage('Error deleting property: ' + error.message);
       }
+    }
+  };
+
+  const handleNavigatePrev = () => {
+    if (prevId) {
+      setEditing(false);
+      navigate(`/properties/${prevId}`);
+    }
+  };
+
+  const handleNavigateNext = () => {
+    if (nextId) {
+      setEditing(false);
+      navigate(`/properties/${nextId}`);
     }
   };
 
@@ -99,81 +134,94 @@ function PropertyDetail() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <PropertyPageLayout title="View Property" onBack={() => navigate('/properties')}>
         <Typography>Loading property...</Typography>
-      </Container>
+      </PropertyPageLayout>
     );
   }
 
   if (!property) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <PropertyPageLayout title="View Property" onBack={() => navigate('/properties')}>
         <Typography>Property not found</Typography>
-      </Container>
+      </PropertyPageLayout>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <PropertyPageLayout
+      title={editing ? 'Edit Property' : 'View Property'}
+      onBack={() => navigate('/properties')}
+      actions={
+        editing ? (
+          <>
+            <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} size="small">
+              Save
+            </Button>
+            <Button variant="outlined" onClick={() => setEditing(false)} size="small">
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <div className="flex justify-center items-center w-full gap-2 flex-wrap">
+            {/* View (current) */}
+            <button
+              title="Viewing"
+              className="w-8 h-8 bg-blue-500 text-white rounded-md flex items-center justify-center opacity-60 cursor-default"
+              disabled
+            >
+              <EyeIcon className="w-4 h-4" />
+            </button>
+            {/* Edit */}
+            <button
+              onClick={() => setEditing(true)}
+              title="Edit Property"
+              className="w-8 h-8 bg-purple-500 hover:bg-purple-600 text-white rounded-md flex items-center justify-center transition-colors"
+            >
+              <PencilIcon className="w-4 h-4" />
+            </button>
+            {/* Follow-up Actions */}
+            <FollowUpActions property={property} onUpdate={fetchProperty} />
+            {/* Property Actions (Like, Love, Rating, Archive) */}
+            <PropertyActions property={property} onUpdate={fetchProperty} />
+            {/* Delete */}
+            <button
+              onClick={handleDelete}
+              title="Delete Property"
+              className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-md flex items-center justify-center transition-colors"
+            >
+              <TrashIcon className="w-4 h-4" />
+            </button>
+          </div>
+        )
+      }
+    >
       {message && (
         <Alert severity={message.includes('Error') ? 'error' : 'success'} sx={{ mb: 2 }}>
           {message}
         </Alert>
       )}
 
-      <Box sx={{ mb: 3 }}>
+      {/* Prev / Next navigation */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/properties')}
-          sx={{ mb: 2 }}
+          variant="outlined"
+          size="small"
+          onClick={handleNavigatePrev}
+          disabled={!prevId}
+          startIcon={<ChevronLeftIcon className="w-4 h-4" />}
         >
-          Back to Properties
+          Previous
         </Button>
-
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h4">
-            {editing ? 'Edit Property' : property.title}
-          </Typography>
-          
-          <Box>
-            {editing ? (
-              <>
-                <Button
-                  variant="contained"
-                  startIcon={<SaveIcon />}
-                  onClick={handleSave}
-                  sx={{ mr: 1 }}
-                >
-                  Save
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => setEditing(false)}
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outlined"
-                  onClick={() => setEditing(true)}
-                  sx={{ mr: 1 }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<DeleteIcon />}
-                  onClick={handleDelete}
-                >
-                  Delete
-                </Button>
-              </>
-            )}
-          </Box>
-        </Box>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleNavigateNext}
+          disabled={!nextId}
+          endIcon={<ChevronRightIcon className="w-4 h-4" />}
+        >
+          Next
+        </Button>
       </Box>
 
       <Grid container spacing={3}>
@@ -388,7 +436,7 @@ function PropertyDetail() {
           </Card>
         </Grid>
       </Grid>
-    </Container>
+    </PropertyPageLayout>
   );
 }
 

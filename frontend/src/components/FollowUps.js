@@ -7,6 +7,7 @@ import api from '../services/api';
 import '../styles/FollowUps.css';
 import { Box, FormControlLabel, Switch } from '@mui/material';
 import SearchFilter from './ui/SearchFilter';
+import BackButton from './ui/BackButton';
 
 const FollowUps = () => {
   const [loading, setLoading] = useState(true);
@@ -106,6 +107,9 @@ const FollowUps = () => {
 
   return (
     <div className="follow-ups-container">
+      <div style={{ marginBottom: 8 }}>
+        <BackButton />
+      </div>
       <div className="follow-ups-header">
         <h1>Property Follow-ups</h1>
         <div className="follow-up-stats">
