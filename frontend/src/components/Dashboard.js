@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BuildingOfficeIcon,
-  ArrowPathIcon,
   ClockIcon,
   ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
@@ -177,7 +176,7 @@ function Dashboard() {
                 {counts?.followUps?.total || 0}
               </div>
               <div className="text-[10px] text-gray-500">
-                Follow Ups
+                Total Follow-Ups
               </div>
             </div>
           </div>
@@ -246,13 +245,7 @@ function Dashboard() {
                 View All Results
               </button>
             )}
-            <button
-              onClick={fetchStats}
-              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm flex items-center gap-2"
-            >
-              <ArrowPathIcon className="w-4 h-4" />
-              Refresh
-            </button>
+            
           </div>
         </div>
         

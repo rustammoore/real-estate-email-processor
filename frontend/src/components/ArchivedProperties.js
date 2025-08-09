@@ -4,13 +4,11 @@ import {
   Typography,
   Box,
   Alert,
-  Button,
   IconButton,
   Tooltip
 } from '@mui/material';
 import {
-  Unarchive as UnarchiveIcon,
-  Refresh as RefreshIcon
+  Unarchive as UnarchiveIcon
 } from '@mui/icons-material';
 import BackButton from './ui/BackButton';
 import PropertyGrid from './PropertyGrid';
@@ -44,14 +42,6 @@ function ArchivedProperties() {
           <Typography variant="h4" gutterBottom>
             Archived Properties
           </Typography>
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={fetchArchivedProperties}
-            variant="outlined"
-            size="small"
-          >
-            Refresh
-          </Button>
         </Box>
       </Box>
 

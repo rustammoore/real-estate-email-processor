@@ -15,7 +15,6 @@ import {
 import {
   RestoreFromTrash as RestoreIcon,
   DeleteForever as DeleteForeverIcon,
-  Refresh as RefreshIcon,
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -181,15 +180,6 @@ function DeletedProperties() {
           <Typography variant="h4" gutterBottom>
             Deleted Properties
           </Typography>
-          
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={fetchDeletedProperties}
-            variant="outlined"
-            size="small"
-          >
-            Refresh
-          </Button>
         </Box>
       </Box>
 
