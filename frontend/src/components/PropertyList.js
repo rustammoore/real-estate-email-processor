@@ -16,6 +16,7 @@ function PropertyList() {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setMessage] = useState('');
+  const [showRegular, setShowRegular] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedProperties, setDeletedProperties] = useState([]);
@@ -94,6 +95,8 @@ function PropertyList() {
   const combinedList = showDeleted ? [...properties, ...deletedProperties] : properties;
   const filteredCombined = filterProperties(combinedList);
   const visible = filteredCombined.filter((p) => {
+    const isRegular = !p.archived && !p.deleted;
+    if (!showRegular && isRegular) return false;
     if (!showArchived && p.archived) return false;
     if (!showDeleted && p.deleted) return false;
     return true;
@@ -105,38 +108,55 @@ function PropertyList() {
         <Typography variant="h5" sx={{ m: 0 }}>
           Property Listings
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showArchived}
-                onChange={(e) => setShowArchived(e.target.checked)}
-                color="primary"
-              />
-            }
-            label="Show archived"
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showDeleted}
-                onChange={(e) => setShowDeleted(e.target.checked)}
-                color="primary"
-              />
-            }
-            label={loadingDeleted && showDeleted ? 'Loading deleted…' : 'Show deleted'}
-          />
-        </Box>
       </Box>
 
       {/* Centralized Search & Filters */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 2 }}>
         <SearchFilter properties={combinedList} showAdvanced={true} />
-        <Box sx={{ mt: 1 }}>
-          <Typography variant="body2" color="textSecondary">
-            {visible.length} {visible.length === 1 ? 'property' : 'properties'} found
-          </Typography>
-        </Box>
+      </Box>
+
+      {/* Toggle Row - consistent with Follow-Ups */}
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+        <FormControlLabel
+          control={
+            <Switch
+              size="small"
+              checked={showRegular}
+              onChange={(e) => setShowRegular(e.target.checked)}
+              color="primary"
+            />
+          }
+          label="Show Regular"
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              size="small"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              color="primary"
+            />
+          }
+          label="Show Archived"
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              size="small"
+              checked={showDeleted}
+              onChange={(e) => setShowDeleted(e.target.checked)}
+              color="primary"
+            />
+          }
+          label={loadingDeleted && showDeleted ? 'Loading deleted…' : 'Show Deleted'}
+        />
+      </Box>
+
+      {/* Results count */}
+      <Box sx={{ mt: 1 }}>
+        <Typography variant="body2" color="textSecondary">
+          {visible.length} {visible.length === 1 ? 'property' : 'properties'} found
+        </Typography>
       </Box>
 
       {/* Property Grid using unified PropertyCard actions */}

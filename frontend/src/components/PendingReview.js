@@ -36,6 +36,8 @@ function PendingReview() {
   const [pendingProperties, setPendingProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [showRegular, setShowRegular] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [compareDialog, setCompareDialog] = useState({ open: false, duplicate: null, original: null });
   const { fetchPendingReview } = usePendingReview();
@@ -65,8 +67,14 @@ function PendingReview() {
   };
 
   const getVisiblePending = () => {
-    const base = showDeleted ? pendingProperties : pendingProperties.filter((p) => !p.deleted);
-    return filterProperties(base);
+    const filtered = filterProperties(pendingProperties);
+    return filtered.filter((p) => {
+      const isRegular = !p.archived && !p.deleted;
+      if (!showRegular && isRegular) return false;
+      if (!showArchived && p.archived) return false;
+      if (!showDeleted && p.deleted) return false;
+      return true;
+    });
   };
 
   const handleApprove = async (duplicateId, originalId) => {
@@ -137,12 +145,8 @@ function PendingReview() {
         These properties were detected as potential duplicates and require your review.
       </Typography>
 
-      <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <FormControlLabel
-          control={<Switch checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />}
-          label="Show Deleted"
-        />
-      </Box>
+      {/* Spacer before alerts */}
+      <Box sx={{ mb: 1 }} />
 
       {message && (
         <Alert severity={message.includes('Error') ? 'error' : 'success'} sx={{ mb: 2 }}>
@@ -152,6 +156,22 @@ function PendingReview() {
 
       {/* Search Filter */}
       <SearchFilter properties={pendingProperties} showAdvanced={true} />
+
+      {/* Toggle Row - consistent with Follow-Ups (placed under SearchFilter) */}
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
+        <FormControlLabel
+          control={<Switch size="small" checked={showRegular} onChange={(e) => setShowRegular(e.target.checked)} />}
+          label="Show Regular"
+        />
+        <FormControlLabel
+          control={<Switch size="small" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />}
+          label="Show Archived"
+        />
+        <FormControlLabel
+          control={<Switch size="small" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />}
+          label="Show Deleted"
+        />
+      </Box>
 
       {/* Results count */}
       <Box mb={2}>
