@@ -93,7 +93,7 @@ function PropertyCard({
 
       {/* Card Content */}
       <div className={`flex-grow p-${compact ? '3' : '4'}`}>
-        <h3 className={`${compact ? 'text-lg' : 'text-xl'} font-medium mb-1 truncate`}>
+        <h3 className={`${compact ? 'text-base' : 'text-lg'} font-medium mb-1 leading-tight break-words`}>
           {property.property_url ? (
             <a
               href={property.property_url}
