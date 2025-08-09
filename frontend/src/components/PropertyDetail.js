@@ -151,47 +151,40 @@ function PropertyDetail() {
       onBack={() => navigate('/properties')}
       dense
       actions={
-        editing ? (
-          <>
-            <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} size="small">
-              Save
-            </Button>
-            <Button variant="outlined" onClick={() => setEditing(false)} size="small">
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <div className="flex justify-center items-center w-full gap-2 flex-wrap">
-            {/* View (current) */}
-            <button
-              title="Viewing"
-              className="w-8 h-8 bg-blue-500 text-white rounded-md flex items-center justify-center opacity-60 cursor-default"
-              disabled
-            >
-              <EyeIcon className="w-4 h-4" />
-            </button>
-            {/* Edit */}
-            <button
-              onClick={() => setEditing(true)}
-              title="Edit Property"
-              className="w-8 h-8 bg-purple-500 hover:bg-purple-600 text-white rounded-md flex items-center justify-center transition-colors"
-            >
-              <PencilIcon className="w-4 h-4" />
-            </button>
-            {/* Follow-up Actions */}
-            <FollowUpActions property={property} onUpdate={fetchProperty} />
-            {/* Property Actions (Like, Love, Rating, Archive) */}
-            <PropertyActions property={property} onUpdate={fetchProperty} />
-            {/* Delete */}
-            <button
-              onClick={handleDelete}
-              title="Delete Property"
-              className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-md flex items-center justify-center transition-colors"
-            >
-              <TrashIcon className="w-4 h-4" />
-            </button>
-          </div>
-        )
+        editing
+          ? null
+          : (
+            <div className="flex justify-center items-center w-full gap-2 flex-wrap">
+              {/* View (current) */}
+              <button
+                title="Viewing"
+                className="w-8 h-8 bg-blue-500 text-white rounded-md flex items-center justify-center opacity-60 cursor-default"
+                disabled
+              >
+                <EyeIcon className="w-4 h-4" />
+              </button>
+              {/* Edit */}
+              <button
+                onClick={() => setEditing(true)}
+                title="Edit Property"
+                className="w-8 h-8 bg-purple-500 hover:bg-purple-600 text-white rounded-md flex items-center justify-center transition-colors"
+              >
+                <PencilIcon className="w-4 h-4" />
+              </button>
+              {/* Follow-up Actions */}
+              <FollowUpActions property={property} onUpdate={fetchProperty} />
+              {/* Property Actions (Like, Love, Rating, Archive) */}
+              <PropertyActions property={property} onUpdate={fetchProperty} />
+              {/* Delete */}
+              <button
+                onClick={handleDelete}
+                title="Delete Property"
+                className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-md flex items-center justify-center transition-colors"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            </div>
+          )
       }
     >
       {message && (
@@ -200,8 +193,8 @@ function PropertyDetail() {
         </Alert>
       )}
 
-      {/* Prev / Next navigation */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+      {/* Prev / Next navigation with centered status ribbons */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
         <Button
           variant="outlined"
           size="small"
@@ -211,6 +204,20 @@ function PropertyDetail() {
         >
           Previous
         </Button>
+        {(property.deleted || property.archived) && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+            {property.deleted && (
+              <div className="bg-red-600 text-white text-2xs font-bold px-2 py-0.5 rounded">
+                DELETED
+              </div>
+            )}
+            {property.archived && (
+              <div className="bg-orange-500 text-white text-2xs font-bold px-2 py-0.5 rounded">
+                ARCHIVED
+              </div>
+            )}
+          </Box>
+        )}
         <Button
           variant="outlined"
           size="small"
@@ -390,6 +397,16 @@ function PropertyDetail() {
                         </Box>
                       );
                     })}
+                    {editing && (
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
+                        <Button variant="outlined" size="large" onClick={() => setEditing(false)}>
+                          Cancel
+                        </Button>
+                        <Button variant="contained" size="large" startIcon={<SaveIcon />} onClick={handleSave}>
+                          Save
+                        </Button>
+                      </Box>
+                    )}
                   </>
                 );
               })()}
