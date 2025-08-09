@@ -50,12 +50,38 @@ export const formatDateTime = (dateString) => {
   });
 };
 
-// Price formatting
+// Price formatting (robust against "$" and commas, and supports K/M/B suffixes)
+export const parseNumericValue = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const str = String(value).trim();
+
+  // Match common currency strings like "$1,234,567.89" optionally with K/M/B
+  const match = str.match(/^\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)\s*([kKmMbB])?\s*$/);
+  if (match) {
+    let num = Number(match[1].replace(/,/g, ''));
+    if (!Number.isFinite(num)) return null;
+    const suffix = (match[2] || '').toLowerCase();
+    if (suffix === 'k') num *= 1_000;
+    if (suffix === 'm') num *= 1_000_000;
+    if (suffix === 'b') num *= 1_000_000_000;
+    return num;
+  }
+
+  // Fallback: strip non-numeric (keep minus and dot)
+  const sanitized = str.replace(/[^0-9.-]/g, '');
+  const num = Number(sanitized);
+  return Number.isFinite(num) ? num : null;
+};
+
 export const formatPrice = (price) => {
-  if (!price) return '';
-  
+  const numPrice = parseNumericValue(price);
+  if (numPrice === null) {
+    // If we cannot parse, return the original value as string to avoid showing "$NaN"
+    return String(price || '');
+  }
+
   try {
-    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -64,8 +90,18 @@ export const formatPrice = (price) => {
     }).format(numPrice);
   } catch (error) {
     console.warn('Failed to format price:', error);
-    return price;
+    return String(price || '');
   }
+};
+
+// Compute price per square foot (derived on client when backend omits it)
+export const computePricePerFt = (price, squareFeet) => {
+  const priceNum = parseNumericValue(price);
+  const sqftNum = parseNumericValue(squareFeet);
+  if (!Number.isFinite(priceNum) || !Number.isFinite(sqftNum) || sqftNum <= 0) {
+    return null;
+  }
+  return priceNum / sqftNum;
 };
 
 // Validation utilities
@@ -225,3 +261,25 @@ export const getRatingLabel = (rating) => {
   if (rating === 10) return 'Excellent';
   return 'No Rating';
 }; 
+
+// State helpers
+export const normalizeStateCode = (value) => {
+  if (!value) return '';
+  const onlyLetters = String(value).replace(/[^a-z]/gi, '');
+  const code = onlyLetters.slice(0, 2).toUpperCase();
+  return code;
+};
+
+export const getStateColor = (stateCode) => {
+  if (!stateCode) return '#666';
+  const code = normalizeStateCode(stateCode);
+  // Simple deterministic hash to hue
+  let hash = 0;
+  for (let i = 0; i < code.length; i += 1) {
+    hash = ((hash << 5) - hash) + code.charCodeAt(i);
+    hash |= 0; // Convert to 32bit int
+  }
+  const hue = Math.abs(hash) % 360;
+  // High saturation, mid lightness for contrast with white text
+  return `hsl(${hue}, 65%, 42%)`;
+};

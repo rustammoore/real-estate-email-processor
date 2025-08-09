@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -36,6 +36,8 @@ function DeletedProperties() {
     propertyId: null,
     propertyTitle: ''
   });
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const navigate = useNavigate();
   const { fetchDeletedProperties: refreshDeletedProperties } = useDeletedProperties();
   const { fetchPendingReview } = usePendingReview();
@@ -61,6 +63,47 @@ function DeletedProperties() {
       setMessage('Error fetching deleted properties: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const filteredDeleted = useMemo(() => filterProperties(deletedProperties), [deletedProperties, filterProperties]);
+
+  const toggleSelectionMode = () => {
+    setSelectionMode((prev) => {
+      const next = !prev;
+      if (!next) setSelectedIds(new Set());
+      return next;
+    });
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(filteredDeleted.map((p) => p.id)));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkPermanentDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      // Fire deletes in parallel
+      await Promise.all(ids.map((id) => api.permanentlyDeleteProperty(id)));
+      setMessage(`${ids.length} propert${ids.length === 1 ? 'y' : 'ies'} permanently deleted!`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      fetchDeletedProperties();
+      refreshDeletedProperties();
+    } catch (error) {
+      setMessage('Error deleting selected: ' + error.message);
     }
   };
 
@@ -112,6 +155,8 @@ function DeletedProperties() {
       await handleRestore(propertyId);
     } else if (action === 'permanent-delete') {
       await handlePermanentDelete(propertyId);
+    } else if (action === 'bulk-permanent-delete') {
+      await handleBulkPermanentDelete();
     }
     
     closeConfirmDialog();
@@ -123,6 +168,8 @@ function DeletedProperties() {
       return 'Restore Property';
     } else if (action === 'permanent-delete') {
       return 'Permanently Delete Property';
+    } else if (action === 'bulk-permanent-delete') {
+      return 'Permanently Delete Selected';
     }
     return 'Confirm Action';
   };
@@ -133,6 +180,9 @@ function DeletedProperties() {
       return `Are you sure you want to restore "${propertyTitle}"? This will make it active again.`;
     } else if (action === 'permanent-delete') {
       return `Are you sure you want to permanently delete "${propertyTitle}"? This action cannot be undone.`;
+    } else if (action === 'bulk-permanent-delete') {
+      const count = selectedIds.size;
+      return `Are you sure you want to permanently delete ${count} selected propert${count === 1 ? 'y' : 'ies'}? This cannot be undone.`;
     }
     return '';
   };
@@ -180,6 +230,33 @@ function DeletedProperties() {
           <Typography variant="h4" gutterBottom>
             Deleted Properties
           </Typography>
+          <Box display="flex" gap={1} alignItems="center">
+            {!selectionMode ? (
+              <Button variant="outlined" onClick={toggleSelectionMode} disabled={filteredDeleted.length === 0}>
+                Select
+              </Button>
+            ) : (
+              <>
+                <Button variant="outlined" onClick={selectAll} disabled={filteredDeleted.length === 0}>
+                  Select All
+                </Button>
+                <Button variant="outlined" onClick={clearSelection} disabled={selectedIds.size === 0}>
+                  Clear
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="error" 
+                  onClick={() => openConfirmDialog('bulk-permanent-delete', null, '')}
+                  disabled={selectedIds.size === 0}
+                >
+                  Delete Selected
+                </Button>
+                <Button variant="text" onClick={toggleSelectionMode}>
+                  Done
+                </Button>
+              </>
+            )}
+          </Box>
         </Box>
       </Box>
 
@@ -199,17 +276,25 @@ function DeletedProperties() {
       {/* Results count */}
       <Box mb={2}>
         <Typography variant="body2" color="textSecondary">
-          {filterProperties(deletedProperties).length} deleted {filterProperties(deletedProperties).length === 1 ? 'property' : 'properties'} found
+          {filteredDeleted.length} deleted {filteredDeleted.length === 1 ? 'property' : 'properties'} found
+          {selectionMode && (
+            <>
+              {' '}• {selectedIds.size} selected
+            </>
+          )}
         </Typography>
       </Box>
 
       <PropertyGrid 
-        properties={filterProperties(deletedProperties)}
+        properties={filteredDeleted}
         customActions={customActions}
         emptyMessage="No deleted properties found"
         loading={loading}
         variant="outlined"
         showFollowUpBadge={true}
+        selectMode={selectionMode}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelectOne}
         onFollowUpSet={(propertyId, days) => {
           // Follow-up set - refresh the list
           fetchDeletedProperties();

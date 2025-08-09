@@ -10,7 +10,7 @@ import StatusBadge from './ui/StatusBadge';
 import PropertyActions from './ui/PropertyActions';
 import FollowUpBadge from './ui/FollowUpBadge';
 import FollowUpActions from './ui/FollowUpActions';
-import { parseImages, formatDate, formatPrice } from '../utils';
+import { parseImages, formatDate, formatPrice, computePricePerFt, getStateColor } from '../utils';
 import { UI_CONSTANTS } from '../constants';
 import ConfirmationDialog from './ui/ConfirmationDialog';
 import { useToast } from '../contexts/ToastContext';
@@ -26,7 +26,11 @@ function PropertyCard({
   showFollowUpBadge = false,
   onFollowUpRemoved = null,
   onFollowUpSet = null,
-  onUpdate = null
+  onUpdate = null,
+  // Selection mode props for bulk actions
+  selectMode = false,
+  isSelected = false,
+  onSelectToggle = null
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -58,6 +62,12 @@ function PropertyCard({
   const cardHeight = compact ? 'auto' : '100%';
   const imageHeight = compact ? UI_CONSTANTS.COMPACT_CARD_HEIGHT : UI_CONSTANTS.DEFAULT_CARD_HEIGHT;
   const descriptionLength = compact ? UI_CONSTANTS.COMPACT_DESCRIPTION_LENGTH : UI_CONSTANTS.DEFAULT_DESCRIPTION_LENGTH;
+  const pricePerFt = (() => {
+    const serverValue = property.price_per_ft;
+    if (Number.isFinite(serverValue) && serverValue > 0) return serverValue;
+    const computed = computePricePerFt(property.price, property.square_feet);
+    return Number.isFinite(computed) && computed > 0 ? computed : null;
+  })();
 
   return (
     <div 
@@ -71,6 +81,21 @@ function PropertyCard({
         relative overflow-visible
       `}
     >
+      {/* Selection Checkbox (top-right) */}
+      {selectMode && (
+        <div className="absolute top-2 right-2 z-20">
+          <input
+            type="checkbox"
+            checked={Boolean(isSelected)}
+            onChange={(e) => {
+              e.stopPropagation();
+              if (onSelectToggle) onSelectToggle();
+            }}
+            className="w-4 h-4 accent-blue-600 cursor-pointer"
+            aria-label={isSelected ? 'Deselect property' : 'Select property'}
+          />
+        </div>
+      )}
       {/* Status Badges (DELETED then ARCHIVED) */}
       {(property.deleted || property.archived) && (
         <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
@@ -163,11 +188,11 @@ function PropertyCard({
               ].filter(Boolean).join(' | ')}
             </p>
           )}
-          {(property.square_feet || property.price_per_ft) && (
+          {(property.square_feet || pricePerFt) && (
             <p className="text-xs text-gray-700">
               {[
                 property.square_feet ? `📐 ${property.square_feet} ft²` : null,
-                property.price_per_ft ? `💵 $${Math.round(property.price_per_ft).toLocaleString()}/ft²` : null,
+                pricePerFt ? `💵 $${Math.round(pricePerFt).toLocaleString()}/ft²` : null,
               ].filter(Boolean).join(' | ')}
             </p>
           )}
@@ -183,8 +208,25 @@ function PropertyCard({
           {property.email_source && (
             <p className="text-xs text-gray-700">📧 {property.email_source}</p>
           )}
-          {(property.email_date || property.createdAt) && (
-            <p className="text-xs text-gray-700">📅 {formatDate(property.email_date || property.createdAt)}</p>
+          {(property.email_date || property.createdAt || property.state) && (
+            <div className="text-xs text-gray-700 flex items-center justify-between">
+              <span className="whitespace-nowrap">
+                {property.email_date || property.createdAt ? (
+                  <>📅 {formatDate(property.email_date || property.createdAt)}</>
+                ) : (
+                  <span />
+                )}
+              </span>
+              {property.state && (
+                <span
+                  className="whitespace-nowrap px-2 py-0.5 rounded text-white font-bold text-sm"
+                  style={{ backgroundColor: getStateColor(property.state) }}
+                  title="State"
+                >
+                  {String(property.state).toUpperCase()}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -28,6 +28,7 @@ router.post('/', protect, async (req, res) => {
       property_url,
       for_lease_info,
       other,
+      procured,
       email_source,
       email_subject,
       email_date

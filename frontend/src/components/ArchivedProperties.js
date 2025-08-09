@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Container,
   Typography,
   Box,
   Alert,
+  Button,
   IconButton,
   Tooltip
 } from '@mui/material';
@@ -15,12 +16,14 @@ import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
 import { useArchivedProperties } from '../hooks/useArchivedProperties';
 import { useSearch } from '../contexts/SearchContext';
-import { toggleArchive } from '../services/api';
+import { toggleArchive, updateProperty } from '../services/api';
 
 function ArchivedProperties() {
   const [message, setMessage] = useState('');
   const { archivedProperties, loading, fetchArchivedProperties } = useArchivedProperties();
   const { filterProperties } = useSearch();
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const handleUnarchive = async (propertyId) => {
     try {
@@ -32,7 +35,41 @@ function ArchivedProperties() {
     }
   };
 
-  const filteredProperties = filterProperties(archivedProperties);
+  const filteredProperties = useMemo(() => filterProperties(archivedProperties), [archivedProperties, filterProperties]);
+
+  const toggleSelectionMode = () => {
+    setSelectionMode((prev) => {
+      const next = !prev;
+      if (!next) setSelectedIds(new Set());
+      return next;
+    });
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(filteredProperties.map((p) => p.id)));
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkUnarchive = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      await Promise.all(ids.map((id) => updateProperty(id, { archived: false })));
+      setMessage(`${ids.length} propert${ids.length === 1 ? 'y' : 'ies'} unarchived successfully!`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      fetchArchivedProperties();
+    } catch (error) {
+      setMessage('Error unarchiving selected: ' + (error?.message || 'Unknown error'));
+    }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -42,6 +79,33 @@ function ArchivedProperties() {
           <Typography variant="h4" gutterBottom>
             Archived Properties
           </Typography>
+          <Box display="flex" gap={1} alignItems="center">
+            {!selectionMode ? (
+              <Button variant="outlined" onClick={toggleSelectionMode} disabled={filteredProperties.length === 0}>
+                Select
+              </Button>
+            ) : (
+              <>
+                <Button variant="outlined" onClick={selectAll} disabled={filteredProperties.length === 0}>
+                  Select All
+                </Button>
+                <Button variant="outlined" onClick={clearSelection} disabled={selectedIds.size === 0}>
+                  Clear
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="success" 
+                  onClick={handleBulkUnarchive}
+                  disabled={selectedIds.size === 0}
+                >
+                  Unarchive Selected
+                </Button>
+                <Button variant="text" onClick={toggleSelectionMode}>
+                  Done
+                </Button>
+              </>
+            )}
+          </Box>
         </Box>
       </Box>
 
@@ -64,6 +128,9 @@ function ArchivedProperties() {
       <Box mb={2}>
         <Typography variant="body2" color="textSecondary">
           {filteredProperties.length} archived {filteredProperties.length === 1 ? 'property' : 'properties'} found
+          {selectionMode && (
+            <> • {selectedIds.size} selected</>
+          )}
         </Typography>
       </Box>
 
@@ -71,6 +138,9 @@ function ArchivedProperties() {
         properties={filteredProperties}
         loading={loading}
         emptyMessage="No archived properties found"
+        selectMode={selectionMode}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelectOne}
         customActions={(property) => (
           <Tooltip title="Unarchive">
             <IconButton

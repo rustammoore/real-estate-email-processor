@@ -13,7 +13,11 @@ function PropertyGrid({
   showFollowUpBadge = true,
   onFollowUpSet = null,
   onFollowUpRemoved = null,
-  onUpdate = null
+  onUpdate = null,
+  // Bulk selection mode controls
+  selectMode = false,
+  selectedIds = new Set(),
+  onToggleSelect = null
 }) {
   if (loading) {
     return (
@@ -49,6 +53,9 @@ function PropertyGrid({
           onFollowUpSet={onFollowUpSet}
           onFollowUpRemoved={onFollowUpRemoved}
           onUpdate={onUpdate}
+          selectMode={selectMode}
+          isSelected={selectedIds instanceof Set ? selectedIds.has(property.id) : Boolean(selectedIds?.includes?.(property.id))}
+          onSelectToggle={onToggleSelect ? () => onToggleSelect(property.id) : null}
         />
       ))}
     </div>

@@ -283,6 +283,16 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                               rows={field.ui?.rows || (field.name === 'description' ? 4 : undefined)}
                               size="small"
                                 disabled={field.name === 'price_per_ft'}
+                              inputProps={field.name === 'state' ? { maxLength: 2, style: { textTransform: 'uppercase' } } : undefined}
+                              onBlur={(e) => {
+                                if (field.name === 'state') {
+                                  const raw = e.target.value || '';
+                                  const normalized = raw.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+                                  if (normalized !== raw) {
+                                    handleInputChange('state', normalized);
+                                  }
+                                }
+                              }}
                             />
                           </Grid>
                         );

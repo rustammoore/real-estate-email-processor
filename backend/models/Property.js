@@ -39,7 +39,10 @@ const propertySchema = new mongoose.Schema({
   },
   state: {
     type: String,
-    trim: true
+    trim: true,
+    uppercase: true,
+    minlength: 2,
+    maxlength: 2,
   },
   square_feet: {
     type: String,
