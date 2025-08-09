@@ -1,29 +1,39 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { PROPERTY_FIELDS, PROPERTY_FIELDS_MAP } from '../constants/propertySchema';
 
 const SearchContext = createContext();
 
-// Property field metadata for intelligent filtering
-const PROPERTY_FIELD_METADATA = {
-  // Text fields - searchable by partial match
-  text: ['title', 'description', 'location', 'property_type', 'email_source', 'email_subject'],
-  
-  // Numeric fields - searchable by range
-  numeric: ['price', 'square_feet', 'bedrooms', 'bathrooms', 'rating'],
-  
-  // Boolean fields - searchable by true/false
-  boolean: ['liked', 'loved', 'archived'],
-  
-  // Enum fields - searchable by exact match
-  enum: {
-    status: ['active', 'pending', 'sold', 'archived']
-  },
-  
-  // Date fields - searchable by date range
-  date: ['email_date', 'createdAt', 'updatedAt'],
-  
-  // Special fields that might need custom handling
-        special: ['images', 'duplicate_of', 'property_url']
-};
+// Build metadata map from centralized schema
+const SCHEMA_METADATA = (() => {
+  const meta = { text: [], numeric: [], boolean: [], enum: {}, date: [], special: [], images: [] };
+  PROPERTY_FIELDS.forEach((f) => {
+    switch (f.type) {
+      case 'text':
+        meta.text.push(f.name);
+        break;
+      case 'numeric':
+        meta.numeric.push(f.name);
+        break;
+      case 'boolean':
+        meta.boolean.push(f.name);
+        break;
+      case 'enum':
+        meta.enum[f.name] = f.options || [];
+        break;
+      case 'date':
+        meta.date.push(f.name);
+        break;
+      case 'images':
+        meta.images.push(f.name);
+        break;
+      default:
+        meta.special.push(f.name);
+    }
+  });
+  // Include common backend/system fields for search/sort if present in data
+  ['createdAt', 'updatedAt'].forEach((k) => { if (!meta.date.includes(k)) meta.date.push(k); });
+  return meta;
+})();
 
 export const SearchProvider = ({ children }) => {
   const [searchState, setSearchState] = useState({
@@ -63,15 +73,19 @@ export const SearchProvider = ({ children }) => {
     });
   }, []);
 
-  // Get field type based on value and metadata
+  // Get field type based on centralized schema and value inference
   const getFieldType = useCallback((fieldName, value) => {
-    // Check metadata first
-    if (PROPERTY_FIELD_METADATA.text.includes(fieldName)) return 'text';
-    if (PROPERTY_FIELD_METADATA.numeric.includes(fieldName)) return 'numeric';
-    if (PROPERTY_FIELD_METADATA.boolean.includes(fieldName)) return 'boolean';
-    if (PROPERTY_FIELD_METADATA.enum[fieldName]) return 'enum';
-    if (PROPERTY_FIELD_METADATA.date.includes(fieldName)) return 'date';
-    if (PROPERTY_FIELD_METADATA.special.includes(fieldName)) return 'special';
+    // Prefer schema mapping
+    const schemaField = PROPERTY_FIELDS_MAP[fieldName];
+    if (schemaField?.type) return schemaField.type;
+
+    // Fallback to derived metadata
+    if (SCHEMA_METADATA.text.includes(fieldName)) return 'text';
+    if (SCHEMA_METADATA.numeric.includes(fieldName)) return 'numeric';
+    if (SCHEMA_METADATA.boolean.includes(fieldName)) return 'boolean';
+    if (SCHEMA_METADATA.enum[fieldName]) return 'enum';
+    if (SCHEMA_METADATA.date.includes(fieldName)) return 'date';
+    if (SCHEMA_METADATA.images.includes(fieldName)) return 'images';
 
     // Infer type from value
     if (typeof value === 'string') {
@@ -149,7 +163,7 @@ export const SearchProvider = ({ children }) => {
       const searchLower = searchState.searchTerm.toLowerCase();
       filtered = filtered.filter(property => {
         // Search in all text fields
-        return PROPERTY_FIELD_METADATA.text.some(field => {
+        return SCHEMA_METADATA.text.some(field => {
           const value = property[field];
           return value && String(value).toLowerCase().includes(searchLower);
         });
@@ -230,12 +244,11 @@ export const SearchProvider = ({ children }) => {
 
   // Get all available fields from dynamic fields and metadata
   const availableFields = useMemo(() => {
+    const schemaFields = PROPERTY_FIELDS.map((f) => f.name);
+    const enumFields = Object.keys(SCHEMA_METADATA.enum);
     const allFields = new Set([
-      ...PROPERTY_FIELD_METADATA.text,
-      ...PROPERTY_FIELD_METADATA.numeric,
-      ...PROPERTY_FIELD_METADATA.boolean,
-      ...Object.keys(PROPERTY_FIELD_METADATA.enum),
-      ...PROPERTY_FIELD_METADATA.date,
+      ...schemaFields,
+      ...enumFields,
       ...searchState.dynamicFields
     ]);
 
@@ -243,7 +256,7 @@ export const SearchProvider = ({ children }) => {
       name: field,
       type: getFieldType(field),
       label: field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      options: PROPERTY_FIELD_METADATA.enum[field] || null
+      options: (PROPERTY_FIELDS_MAP[field]?.options) || SCHEMA_METADATA.enum[field] || null
     }));
   }, [searchState.dynamicFields, getFieldType]);
 

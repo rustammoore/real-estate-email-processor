@@ -4,9 +4,12 @@ import { Card, CardContent, Typography, Button, TextField, Grid, Box, Chip, Imag
 import SaveIcon from '@mui/icons-material/Save';
 import { EyeIcon, PencilIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import api from '../services/api';
+import { PROPERTY_CONTEXTS, getFieldsForContext, PROPERTY_SECTIONS, getEnumOptions } from '../constants/propertySchema';
 import PropertyPageLayout from './layout/PropertyPageLayout';
 import FollowUpActions from './ui/FollowUpActions';
 import PropertyActions from './ui/PropertyActions';
+import ImageManager from './ui/ImageManager';
+import { normalizeImages } from '../utils/images';
 
 function PropertyDetail() {
   const { id } = useParams();
@@ -63,17 +66,11 @@ function PropertyDetail() {
     try {
       const data = await api.getProperty(id);
       setProperty(data);
-      setFormData({
-        title: data.title || '',
-        description: data.description || '',
-        price: data.price || '',
-        location: data.location || '',
-        property_type: data.property_type || '',
-        square_feet: data.square_feet || '',
-        bedrooms: data.bedrooms || '',
-        bathrooms: data.bathrooms || '',
-        status: data.status || 'active'
-      });
+      // Initialize from schema-visible fields for edit context
+      const fields = getFieldsForContext(PROPERTY_CONTEXTS.EDIT);
+      const next = {};
+      fields.forEach((f) => { next[f.name] = data[f.name] ?? (f.defaultValue ?? ''); });
+      setFormData(next);
     } catch (error) {
       console.error('Error fetching property:', error);
       setMessage('Error loading property');
@@ -152,6 +149,7 @@ function PropertyDetail() {
     <PropertyPageLayout
       title={editing ? 'Edit Property' : 'View Property'}
       onBack={() => navigate('/properties')}
+      dense
       actions={
         editing ? (
           <>
@@ -203,7 +201,7 @@ function PropertyDetail() {
       )}
 
       {/* Prev / Next navigation */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
         <Button
           variant="outlined"
           size="small"
@@ -224,214 +222,179 @@ function PropertyDetail() {
         </Button>
       </Box>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {/* Property Images */}
-        {property.images && property.images.length > 0 && (
+        {(editing || (property.images && property.images.length > 0)) && (
           <Grid item xs={12}>
             <Card>
-              <CardContent>
+              <CardContent sx={{ py: 1, px: 1.5 }}>
                 <Typography variant="h6" gutterBottom>
                   Property Images
                 </Typography>
-                <ImageList cols={3} rowHeight={200}>
-                  {property.images.map((image, index) => (
-                    <ImageListItem key={index}>
-                      <img
-                        src={image}
-                        alt={`Property ${index + 1}`}
-                        loading="lazy"
-                        style={{ objectFit: 'cover' }}
-                      />
-                    </ImageListItem>
-                  ))}
-                </ImageList>
+                <ImageManager
+                  mode={editing ? 'edit' : 'view'}
+                  value={editing ? formData.images : normalizeImages(property.images)}
+                  onChange={(imgs) => editing && setFormData((prev) => ({ ...prev, images: imgs }))}
+                  columns={3}
+                  tileHeight={96}
+                  dropzoneSize={160}
+                />
               </CardContent>
             </Card>
           </Grid>
         )}
 
-        {/* Property Details */}
+        {/* Property Details (schema-driven) */}
         <Grid item xs={12} md={8}>
           <Card>
-            <CardContent>
+            <CardContent sx={{ py: 1, px: 1.5 }}>
               <Typography variant="h6" gutterBottom>
                 Property Details
               </Typography>
 
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Title"
-                    value={editing ? formData.title : property.title}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
-                    disabled={!editing}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Price"
-                    value={editing ? formData.price : property.price}
-                    onChange={(e) => handleInputChange('price', e.target.value)}
-                    disabled={!editing}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Location"
-                    value={editing ? formData.location : property.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    disabled={!editing}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Property Type"
-                    value={editing ? formData.property_type : property.property_type}
-                    onChange={(e) => handleInputChange('property_type', e.target.value)}
-                    disabled={!editing}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={4}>
-                  <TextField
-                    fullWidth
-                    label="Square Feet"
-                    value={editing ? formData.square_feet : property.square_feet}
-                    onChange={(e) => handleInputChange('square_feet', e.target.value)}
-                    disabled={!editing}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={4}>
-                  <TextField
-                    fullWidth
-                    label="Bedrooms"
-                    value={editing ? formData.bedrooms : property.bedrooms}
-                    onChange={(e) => handleInputChange('bedrooms', e.target.value)}
-                    disabled={!editing}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={4}>
-                  <TextField
-                    fullWidth
-                    label="Bathrooms"
-                    value={editing ? formData.bathrooms : property.bathrooms}
-                    onChange={(e) => handleInputChange('bathrooms', e.target.value)}
-                    disabled={!editing}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Description"
-                    value={editing ? formData.description : property.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    disabled={!editing}
-                    multiline
-                    rows={4}
-                    margin="normal"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth margin="normal">
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={editing ? formData.status : property.status}
-                      label="Status"
-                      onChange={(e) => handleInputChange('status', e.target.value)}
-                      disabled={!editing}
-                    >
-                      <MenuItem value="active">Active</MenuItem>
-                      <MenuItem value="sold">Sold</MenuItem>
-                      <MenuItem value="pending">Pending</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
+              <Grid container spacing={0.5}>
+                {getFieldsForContext(editing ? PROPERTY_CONTEXTS.EDIT : PROPERTY_CONTEXTS.VIEW)
+                  .filter((f) => f.type !== 'images' && f.section !== PROPERTY_SECTIONS.ADDITIONAL)
+                  .map((field) => {
+                    const value = editing ? formData[field.name] : property[field.name];
+                    if (field.type === 'enum') {
+                      const options = getEnumOptions(field.name);
+                      return (
+                         <Grid item xs={12} sm={field.name === 'description' ? 12 : 6} key={field.name}>
+                          <FormControl fullWidth size="small" margin="dense">
+                            <InputLabel>{field.label}</InputLabel>
+                            <Select
+                              value={value || ''}
+                              label={field.label}
+                              onChange={(e) => handleInputChange(field.name, e.target.value)}
+                              disabled={!editing}
+                            >
+                              {options.map((opt) => (
+                                <MenuItem key={opt} value={opt}>{String(opt)}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      );
+                    }
+                    return (
+                       <Grid item xs={12} sm={field.name === 'description' ? 12 : 6} key={field.name}>
+                        <TextField
+                          fullWidth
+                          label={field.label}
+                          value={value || ''}
+                          onChange={(e) => handleInputChange(field.name, e.target.value)}
+                          disabled={!editing}
+                          margin="dense"
+                          multiline={Boolean(field.ui?.multiline) || field.name === 'description'}
+                          rows={field.ui?.rows || (field.name === 'description' ? 4 : undefined)}
+                          size="small"
+                        />
+                      </Grid>
+                    );
+                  })}
               </Grid>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Property URL and Email Info */}
+        {/* Additional Information (schema-driven, editable in edit mode) */}
         <Grid item xs={12} md={4}>
           <Card>
-            <CardContent>
+            <CardContent sx={{ py: 1, px: 1.5 }}>
               <Typography variant="h6" gutterBottom>
                 Additional Information
               </Typography>
 
-              {property.property_url && (
-                <Box sx={{ mb: 2 }}>
+              {(() => {
+                const additionalFields = getFieldsForContext(editing ? PROPERTY_CONTEXTS.EDIT : PROPERTY_CONTEXTS.VIEW)
+                  .filter((f) => f.section === PROPERTY_SECTIONS.ADDITIONAL);
+
+                return (
+                  <>
+                    {additionalFields.map((field) => {
+                      if (editing) {
+                        // Editable fields in edit context (text fields)
+                        if (field.type === 'text') {
+                          return (
+                            <Box sx={{ mb: 1 }} key={field.name}>
+                              <TextField
+                                fullWidth
+                                label={field.label}
+                                value={formData[field.name] ?? ''}
+                                onChange={(e) => handleInputChange(field.name, e.target.value)}
+                                size="small"
+                                margin="dense"
+                              />
+                            </Box>
+                          );
+                        }
+                        // Skip non-editable types in edit context
+                        return null;
+                      }
+
+                      // View mode presentation
+                      if (field.name === 'property_url' && property.property_url) {
+                        return (
+                          <Box sx={{ mb: 1 }} key={field.name}>
+                            <Typography variant="subtitle2" color="textSecondary">
+                              Property URL:
+                            </Typography>
+                            <Button
+                              href={property.property_url}
+                              target="_blank"
+                              variant="outlined"
+                              fullWidth
+                              sx={{ mt: 1 }}
+                            >
+                              View Original Listing
+                            </Button>
+                          </Box>
+                        );
+                      }
+
+                      if (field.type === 'date' && property[field.name]) {
+                        return (
+                          <Box sx={{ mb: 1 }} key={field.name}>
+                            <Typography variant="subtitle2" color="textSecondary">
+                              {field.label}:
+                            </Typography>
+                            <Typography variant="body2">
+                              {new Date(property[field.name]).toLocaleString()}
+                            </Typography>
+                          </Box>
+                        );
+                      }
+
+                      return (
+                        <Box sx={{ mb: 1 }} key={field.name}>
+                          <Typography variant="subtitle2" color="textSecondary">
+                            {field.label}:
+                          </Typography>
+                          <Typography variant="body2">
+                            {property[field.name] || ''}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+
+              {/* Status chip can be inferred from the status field above; keep the chip for quick glance */}
+              {'status' in property && (
+                <Box sx={{ mt: 1 }}>
                   <Typography variant="subtitle2" color="textSecondary">
-                    Property URL:
+                    Status:
                   </Typography>
-                  <Button
-                    href={property.property_url}
-                    target="_blank"
-                    variant="outlined"
-                    fullWidth
+                  <Chip
+                    label={property.status}
+                    color={property.status === 'active' ? 'success' : 
+                           property.status === 'sold' ? 'error' : 'warning'}
                     sx={{ mt: 1 }}
-                  >
-                    View Original Listing
-                  </Button>
+                  />
                 </Box>
               )}
-
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="textSecondary">
-                  Email Source:
-                </Typography>
-                <Typography variant="body2">
-                  {property.email_source}
-                </Typography>
-              </Box>
-
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="textSecondary">
-                  Email Subject:
-                </Typography>
-                <Typography variant="body2">
-                  {property.email_subject}
-                </Typography>
-              </Box>
-
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="textSecondary">
-                  Date Received:
-                </Typography>
-                <Typography variant="body2">
-                  {new Date(property.email_date).toLocaleString()}
-                </Typography>
-              </Box>
-
-              <Box>
-                <Typography variant="subtitle2" color="textSecondary">
-                  Status:
-                </Typography>
-                <Chip
-                  label={property.status}
-                  color={property.status === 'active' ? 'success' : 
-                         property.status === 'sold' ? 'error' : 'warning'}
-                  sx={{ mt: 1 }}
-                />
-              </Box>
             </CardContent>
           </Card>
         </Grid>

@@ -152,35 +152,59 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             variant="outlined"
             size="small"
             fullWidth
+            sx={{ '& .MuiInputBase-input': { py: 0.5 } }}
           />
         );
 
       case 'numeric':
-        // Get min/max values from properties
+        // Collect numeric values across properties for dynamic bounds
         const numericValues = properties
           .map(p => parseFloat(p[field.name]))
-          .filter(v => !isNaN(v));
-        const min = Math.min(...numericValues) || 0;
-        const max = Math.max(...numericValues) || 100;
-        const range = currentValue || { min, max };
+          .filter(v => Number.isFinite(v));
+
+        let computedMin;
+        let computedMax;
+        if (numericValues.length === 0) {
+          computedMin = 0;
+          computedMax = 100;
+        } else {
+          computedMin = Math.min(...numericValues);
+          computedMax = Math.max(...numericValues);
+          if (!Number.isFinite(computedMin)) computedMin = 0;
+          if (!Number.isFinite(computedMax)) computedMax = 100;
+        }
+        // Ensure there is visible range (two thumbs shouldn't overlap)
+        if (computedMin === computedMax) {
+          computedMax = computedMin + 1;
+        }
+
+        const initialRange = (currentValue && typeof currentValue === 'object')
+          ? currentValue
+          : { min: computedMin, max: computedMax };
+
+        const clampedMin = Math.max(computedMin, Number(initialRange.min ?? computedMin));
+        const clampedMax = Math.min(computedMax, Number(initialRange.max ?? computedMax));
 
         return (
           <Box key={field.name}>
-            <Typography gutterBottom>{field.label}</Typography>
-            <Box sx={{ px: 1 }}>
+            <Typography gutterBottom variant="caption">{field.label}</Typography>
+            <Box sx={{ px: 0.5 }}>
               <Slider
-                value={[range.min || min, range.max || max]}
+                size="small"
+                value={[clampedMin, clampedMax]}
                 onChange={(e, newValue) => {
-                  handleFilterChange(field.name, { min: newValue[0], max: newValue[1] });
+                  const [newMin, newMax] = newValue;
+                  handleFilterChange(field.name, { min: newMin, max: newMax });
                 }}
                 valueLabelDisplay="auto"
-                min={min}
-                max={max}
+                min={computedMin}
+                max={computedMax}
+                disableSwap
               />
             </Box>
             <Box display="flex" justifyContent="space-between">
-              <Typography variant="caption">{range.min || min}</Typography>
-              <Typography variant="caption">{range.max || max}</Typography>
+              <Typography variant="caption">{clampedMin}</Typography>
+              <Typography variant="caption">{clampedMax}</Typography>
             </Box>
           </Box>
         );
@@ -191,11 +215,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             key={field.name}
             control={
               <Switch
+                size="small"
                 checked={currentValue === true}
                 onChange={(e) => handleFilterChange(field.name, e.target.checked ? true : '')}
               />
             }
-            label={field.label}
+            label={<Typography variant="caption">{field.label}</Typography>}
+            sx={{ m: 0, '& .MuiFormControlLabel-label': { ml: 0.5 } }}
           />
         );
 
@@ -207,6 +233,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               value={currentValue}
               label={field.label}
               onChange={(e) => handleFilterChange(field.name, e.target.value)}
+              MenuProps={{
+                PaperProps: {
+                  sx: { '& .MuiMenuItem-root': { minHeight: 28, py: 0.25, fontSize: '0.8rem' } }
+                }
+              }}
             >
               <MenuItem value="">All</MenuItem>
               {field.options?.map(option => (
@@ -222,7 +253,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
         const dateRange = currentValue || { from: null, to: null };
         return (
           <div key={field.name}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+            <Typography variant="caption" className="block mb-1">{field.label}</Typography>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <DatePicker
@@ -230,8 +261,8 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                   onChange={(date) => {
                     handleFilterChange(field.name, { ...dateRange, from: date });
                   }}
-                  placeholderText="From date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholderText="From"
+                  className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   dateFormat="MM/dd/yyyy"
                 />
               </div>
@@ -241,8 +272,8 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                   onChange={(date) => {
                     handleFilterChange(field.name, { ...dateRange, to: date });
                   }}
-                  placeholderText="To date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholderText="To"
+                  className="w-full px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   dateFormat="MM/dd/yyyy"
                 />
               </div>
@@ -255,8 +286,23 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     }
   };
 
-  // Group fields by type for better organization
+  // Identify quick compact fields
+  const quickBooleanNames = ['liked', 'loved', 'archived', 'deleted', 'followUp'];
+  const quickBooleanFields = availableFields.filter(f => f.type === 'boolean' && quickBooleanNames.includes(f.name));
+  const statusField = availableFields.find(f => f.name === 'status');
+  // Inject synthetic boolean for follow-ups: treat as has followUpDate
+  const hasFollowUpField = { name: 'followUp', type: 'boolean', label: 'Follow-ups' };
+  const includeFollowUpSynthetic = true;
+  const quickNames = new Set([
+    ...quickBooleanFields.map(f => f.name),
+    statusField?.name,
+    includeFollowUpSynthetic ? hasFollowUpField.name : undefined
+  ].filter(Boolean));
+
+  // Group remaining fields by type for better organization
   const groupedFields = availableFields.reduce((acc, field) => {
+    // Skip fields that are rendered in the quick compact row
+    if (quickNames.has(field.name)) return acc;
     // Skip special fields and fields that might not be useful for filtering
     if (field.type === 'special' || field.type === 'object' || field.name === 'id' || field.name === '_id') {
       return acc;
@@ -313,7 +359,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   return (
     <Box sx={{ mb: 3 }}>
       {/* Search Bar with Filter Toggle */}
-      <Box display="flex" gap={1} alignItems="center" mb={2}>
+      <Box display="flex" gap={0.5} alignItems="center" mb={1}>
         <TextField
           fullWidth
           placeholder="Search by title, description, location, property type, email..."
@@ -346,10 +392,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
         
         {showAdvanced && (
           <Button
+            size="small"
             variant={showFilters ? "contained" : "outlined"}
             startIcon={<FilterIcon />}
             onClick={() => setShowFilters(!showFilters)}
-            sx={{ minWidth: 120 }}
+            sx={{ minWidth: 90, py: 0.5 }}
           >
             Filters
             {activeFiltersCount > 0 && (
@@ -364,10 +411,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
         )}
         {showAdvanced && (
           <Button
+            size="small"
             variant="contained"
             onClick={handleApply}
             disabled={!hasPendingChanges}
-            sx={{ minWidth: 100 }}
+            sx={{ minWidth: 90, py: 0.5 }}
           >
             Apply
           </Button>
@@ -408,11 +456,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
 
       {/* Advanced Filters */}
       <Collapse in={showFilters}>
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
-          <Grid container spacing={2}>
+        <Box sx={{ mt: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+          <Grid container spacing={1}>
             {/* Sort Controls */}
             <Grid item xs={12}>
-              <Grid container spacing={2} alignItems="center">
+              <Grid container spacing={1} alignItems="center">
                 <Grid item xs={12} md={6}>
                   <FormControl size="small" fullWidth>
                     <InputLabel>Sort By</InputLabel>
@@ -447,15 +495,87 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               </Grid>
             </Grid>
 
+            {/* Quick compact row: Liked, Loved, Archived, Deleted toggles + Status select */}
+            {((quickBooleanFields.length > 0) || statusField || includeFollowUpSynthetic) && (
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                  {quickBooleanFields.map((field) => (
+                    <FormControlLabel
+                      key={field.name}
+                      control={
+                        <Switch
+                          size="small"
+                          checked={pendingFilters[field.name] === true}
+                          onChange={(e) => { handleFilterChange(field.name, e.target.checked ? true : ''); }}
+                        />
+                      }
+                      label={<Typography variant="caption">{field.label}</Typography>}
+                      sx={{ m: 0, '& .MuiFormControlLabel-label': { ml: 0.5 } }}
+                    />
+                  ))}
+                  {includeFollowUpSynthetic && (
+                    <FormControlLabel
+                      key={hasFollowUpField.name}
+                      control={
+                        <Switch
+                          size="small"
+                          checked={Boolean(pendingFilters[hasFollowUpField.name]) === true}
+                          onChange={(e) => { handleFilterChange(hasFollowUpField.name, e.target.checked ? true : ''); }}
+                        />
+                      }
+                      label={<Typography variant="caption">{hasFollowUpField.label}</Typography>}
+                      sx={{ m: 0, '& .MuiFormControlLabel-label': { ml: 0.5 } }}
+                    />
+                  )}
+                  {/* Pending review toggle (maps to status === 'pending') */}
+                  <FormControlLabel
+                    key="status-pending-toggle"
+                    control={
+                      <Switch
+                        size="small"
+                        checked={(pendingFilters.status || '') === 'pending'}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          handleFilterChange('status', checked ? 'pending' : '');
+                        }}
+                      />
+                    }
+                    label={<Typography variant="caption">Pending review</Typography>}
+                    sx={{ m: 0, '& .MuiFormControlLabel-label': { ml: 0.5 } }}
+                  />
+                  {statusField && (
+                    <FormControl size="small" sx={{ minWidth: 140 }}>
+                      <InputLabel>Status</InputLabel>
+                      <Select
+                        value={pendingFilters.status || ''}
+                        label="Status"
+                        onChange={(e) => { handleFilterChange('status', e.target.value); }}
+                        MenuProps={{
+                          PaperProps: { sx: { '& .MuiMenuItem-root': { minHeight: 28, py: 0.25, fontSize: '0.8rem' } } }
+                        }}
+                      >
+                        <MenuItem value="">All</MenuItem>
+                        {(statusField.options || []).map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {option.charAt(0).toUpperCase() + option.slice(1)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+                </Box>
+              </Grid>
+            )}
+
             {/* Grouped Filters */}
             {Object.entries(groupedFields).map(([groupName, fields]) => (
               <Grid item xs={12} key={groupName}>
-                <Accordion defaultExpanded={groupName === 'Status Fields' || groupName === 'Boolean Fields'}>
+                <Accordion defaultExpanded={groupName === 'Status Fields' || groupName === 'Boolean Fields'} sx={{ '& .MuiAccordionSummary-root': { minHeight: 32 }, '& .MuiAccordionSummary-content': { my: 0 } }}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle2">{groupName}</Typography>
+                    <Typography variant="caption">{groupName}</Typography>
                   </AccordionSummary>
-                  <AccordionDetails>
-                    <Grid container spacing={2}>
+                  <AccordionDetails sx={{ pt: 0.5 }}>
+                    <Grid container spacing={1}>
                       {fields.map(field => (
                         <Grid item xs={12} sm={6} md={4} key={field.name}>
                           {renderFilterControl(field)}
@@ -470,12 +590,14 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
 
           <Box display="flex" justifyContent="flex-end" mt={2} gap={1}>
             <Button
+              size="small"
               onClick={() => { setPendingFilters({}); setHasPendingChanges(true); }}
               variant="outlined"
+              sx={{ py: 0.5 }}
             >
               Clear All Filters
             </Button>
-            <Button onClick={handleApply} variant="contained" disabled={!hasPendingChanges}>
+            <Button size="small" onClick={handleApply} variant="contained" disabled={!hasPendingChanges} sx={{ py: 0.5 }}>
               Apply Filters
             </Button>
           </Box>

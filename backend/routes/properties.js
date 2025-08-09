@@ -170,6 +170,12 @@ router.put('/:id', protect, async (req, res) => {
         update[field] = req.body[field];
       }
     }
+    // Allow images updates as well when editing
+    if (Object.prototype.hasOwnProperty.call(req.body, 'images')) {
+      update.images = Array.isArray(req.body.images)
+        ? req.body.images
+        : (req.body.images ? [req.body.images] : []);
+    }
 
     // Basic server-side validation for rating and date formats
     if (Object.prototype.hasOwnProperty.call(update, 'rating')) {

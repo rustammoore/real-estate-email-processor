@@ -5,9 +5,9 @@ const DEFAULT_LIST_LIMIT = Number(process.env.REACT_APP_LIST_LIMIT || 1000);
 
 const client = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // Do not set a global Content-Type. Axios will set the correct header per request:
+  // - application/json for JSON bodies
+  // - multipart/form-data with boundary for FormData
 });
 
 // Auth token management
@@ -90,6 +90,18 @@ export const deleteProperty = async (id) => {
   const response = await client.delete(`/properties/${id}`);
   try { window.dispatchEvent(new Event('property:deleted')); } catch (_) {}
   return response.data;
+};
+
+// Upload API
+export const uploadImages = async (files) => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('images', file));
+  // Do NOT set Content-Type manually so the browser adds the correct boundary
+  const response = await client.post('/uploads/images', formData, {
+    maxContentLength: 10 * 1024 * 1024,
+    maxBodyLength: 10 * 1024 * 1024,
+  });
+  return response.data?.urls || [];
 };
 
 // Email processing API (disabled/stub)
@@ -317,6 +329,7 @@ const apiService = {
   updateProfile: updateProfileApi,
   changePassword: changePasswordApi,
   updateEmailConfig: updateEmailConfigApi,
+  uploadImages,
 };
 
 export default apiService; 

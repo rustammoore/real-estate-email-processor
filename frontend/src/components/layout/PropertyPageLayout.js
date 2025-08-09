@@ -9,11 +9,12 @@ function PropertyPageLayout({
   backLabel = 'Back',
   maxWidth = 'lg',
   children,
+  dense = false,
 }) {
   return (
-    <Container maxWidth={maxWidth} sx={{ mt: 2, mb: 2 }}>
+    <Container maxWidth={maxWidth} sx={{ mt: dense ? 1 : 2, mb: dense ? 1 : 2 }}>
       {(onBack || title || actions) && (
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: dense ? 1 : 2 }}>
           {onBack && (
             <BackButton onClick={onBack} label={backLabel} />
           )}

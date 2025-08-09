@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, Typography, TextField, Button, Grid, Box, Alert, FormControl, InputLabel, Select, MenuItem, IconButton } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, Save as SaveIcon } from '@mui/icons-material';
+import { Card, CardContent, Typography, TextField, Button, Grid, Box, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { Save as SaveIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import PropertyPageLayout from './layout/PropertyPageLayout';
 import api from '../services/api';
+import { PROPERTY_CONTEXTS, getInitialFormData, getFieldsForContext, PROPERTY_FIELDS_MAP, PROPERTY_SECTIONS, getEnumOptions } from '../constants/propertySchema';
+import ImageManager from './ui/ImageManager';
+import { normalizeImages } from '../utils/images';
 
 import { usePendingReview } from '../hooks/usePendingReview';
 
@@ -14,44 +17,14 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
   
   // Use propertyId from props or from URL params
   const actualPropertyId = propertyId || params.id;
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    location: '',
-    property_type: '',
-    square_feet: '',
-    bedrooms: '',
-    bathrooms: '',
-    property_url: '',
-    email_source: '',
-    email_subject: '',
-    status: 'active',
-    images: []
-  });
+  const [formData, setFormData] = useState(() => getInitialFormData(mode === 'edit' ? PROPERTY_CONTEXTS.EDIT : PROPERTY_CONTEXTS.CREATE));
   
-  const [imageUrls, setImageUrls] = useState(['']);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [initialLoading, setInitialLoading] = useState(mode === 'edit');
 
-  const propertyTypes = [
-    'Office',
-    'Retail',
-    'Industrial',
-    'Medical',
-    'Restaurant',
-    'Mixed-Use',
-    'Residential',
-    'Warehouse',
-    'Other'
-  ];
-
-  const statusOptions = [
-    'active',
-    'sold',
-    'pending'
-  ];
+  const propertyTypes = getEnumOptions('property_type');
+  const statusOptions = getEnumOptions('status');
 
   // Load property data for edit mode
   useEffect(() => {
@@ -64,50 +37,15 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
     try {
       const property = await api.getProperty(actualPropertyId);
       
-      // Parse images if they exist
-      let images = [];
-      try {
-        if (property.images) {
-          if (typeof property.images === 'string') {
-            // Handle case where images is a JSON string
-            images = JSON.parse(property.images);
-          } else if (Array.isArray(property.images)) {
-            // Handle case where images is an array
-            if (property.images.length === 1 && typeof property.images[0] === 'string' && property.images[0].startsWith('[')) {
-              // Handle case where images array contains a JSON string
-              images = JSON.parse(property.images[0]);
-            } else {
-              images = property.images;
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Error parsing images:', e);
-        images = [];
-      }
+      // Normalize images from backend to clean string[]
+      const images = normalizeImages(property.images);
 
-      setFormData({
-        title: property.title || '',
-        description: property.description || '',
-        price: property.price || '',
-        location: property.location || '',
-        property_type: property.property_type || '',
-        square_feet: property.square_feet || '',
-        bedrooms: property.bedrooms || '',
-        bathrooms: property.bathrooms || '',
-        property_url: property.property_url || '',
-        email_source: property.email_source || '',
-        email_subject: property.email_subject || '',
-        status: property.status || 'active',
-        images: images
-      });
+      // Merge into initial structure based on schema
+      const base = getInitialFormData(PROPERTY_CONTEXTS.EDIT);
+      const merged = { ...base, ...property, images };
+      setFormData(merged);
 
-      // Set image URLs for editing
-      if (images.length > 0) {
-        setImageUrls([...images, '']);
-      } else {
-        setImageUrls(['']);
-      }
+      // No local image URL list; managed via ImageManager
     } catch (error) {
       setMessage('Error loading property: ' + error.message);
     } finally {
@@ -122,34 +60,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
     }));
   };
 
-  const handleImageUrlChange = (index, value) => {
-    const newImageUrls = [...imageUrls];
-    newImageUrls[index] = value;
-    setImageUrls(newImageUrls);
-    
-    // Update formData images array
-    const filteredImages = newImageUrls.filter(url => url.trim() !== '');
-    setFormData(prev => ({
-      ...prev,
-      images: filteredImages
-    }));
-  };
-
-  const addImageUrl = () => {
-    setImageUrls([...imageUrls, '']);
-  };
-
-  const removeImageUrl = (index) => {
-    const newImageUrls = imageUrls.filter((_, i) => i !== index);
-    setImageUrls(newImageUrls);
-    
-    // Update formData images array
-    const filteredImages = newImageUrls.filter(url => url.trim() !== '');
-    setFormData(prev => ({
-      ...prev,
-      images: filteredImages
-    }));
-  };
+  // Images are managed centrally by ImageManager
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -218,13 +129,18 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
       status: 'active',
       images: []
     });
-    setImageUrls(['']);
+    // images cleared by resetting formData
   };
 
   const isFormValid = () => {
-    return formData.title.trim() !== '' && 
-           formData.location.trim() !== '' && 
-           formData.description.trim() !== '';
+    const requiredFields = getFieldsForContext(mode === 'edit' ? PROPERTY_CONTEXTS.EDIT : PROPERTY_CONTEXTS.CREATE)
+      .filter(f => f.required)
+      .map(f => f.name);
+    return requiredFields.every((name) => {
+      const value = formData[name];
+      if (Array.isArray(value)) return true;
+      return String(value ?? '').trim() !== '';
+    });
   };
 
   const getBackUrl = () => {
@@ -236,14 +152,23 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
 
   if (initialLoading) {
     return (
-      <PropertyPageLayout title={mode === 'create' ? 'Add New Property' : 'Edit Property'} onBack={() => navigate(getBackUrl())}>
+      <PropertyPageLayout title={mode === 'create' ? 'Add New Property' : 'Edit Property'} onBack={() => navigate(getBackUrl())} dense>
         <Typography>Loading property...</Typography>
       </PropertyPageLayout>
     );
   }
 
+  // Group fields by section from schema
+  const visibleFields = getFieldsForContext(mode === 'edit' ? PROPERTY_CONTEXTS.EDIT : PROPERTY_CONTEXTS.CREATE);
+  const fieldsBySection = visibleFields.reduce((acc, field) => {
+    const section = field.section || 'General';
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(field);
+    return acc;
+  }, {});
+
   return (
-    <PropertyPageLayout title={mode === 'create' ? 'Add New Property' : 'Edit Property'} onBack={() => navigate(getBackUrl())}>
+    <PropertyPageLayout title={mode === 'create' ? 'Add New Property' : 'Edit Property'} onBack={() => navigate(getBackUrl())} dense>
       {message && (
         <Alert severity={message.includes('Error') ? 'error' : 'success'} sx={{ mb: 1 }}>
           {message}
@@ -251,221 +176,85 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
       )}
 
       <Card>
-        <CardContent sx={{ py: 1, px: 2 }}>
+        <CardContent sx={{ py: 0.25, px: 1.25 }}>
           <form onSubmit={handleSubmit}>
-            <Grid container spacing={1}>
-              {/* Basic Information */}
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                  Basic Information
-                </Typography>
-              </Grid>
+            <Grid container spacing={0.5}>
+              {Object.entries(fieldsBySection).map(([sectionName, fields]) => (
+                <React.Fragment key={sectionName}>
+                  <Grid item xs={12}>
+                    <Typography variant="overline" sx={{ fontWeight: 'bold', color: 'text.secondary', letterSpacing: 0.5, mt: sectionName === PROPERTY_SECTIONS.BASIC ? 0 : 0.25, mb: 0.25 }}>
+                      {sectionName}
+                    </Typography>
+                  </Grid>
+                  {fields.map((field) => {
+                    if (field.type === 'images') {
+                      return (
+                        <Grid item xs={12} key={field.name}>
+                          <ImageManager
+                            mode={mode === 'create' ? 'create' : 'edit'}
+                            value={formData.images}
+                            onChange={(imgs) => setFormData((prev) => ({ ...prev, images: imgs }))}
+                            columns={3}
+                            tileHeight={96}
+                            dropzoneSize={160}
+                          />
+                        </Grid>
+                      );
+                    }
 
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Property Title *"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
-                  required
-                  size="small"
-                />
-              </Grid>
+                    if (field.type === 'enum') {
+                      const options = getEnumOptions(field.name);
+                      return (
+                        <Grid item xs={12} sm={6} key={field.name}>
+                          <FormControl fullWidth size="small" margin="dense">
+                            <InputLabel>{field.label}</InputLabel>
+                            <Select
+                              value={formData[field.name] || ''}
+                              label={field.label}
+                              onChange={(e) => handleInputChange(field.name, e.target.value)}
+                              MenuProps={{
+                                PaperProps: {
+                                  sx: { '& .MuiMenuItem-root': { minHeight: 28, py: 0.25, fontSize: '0.85rem' } }
+                                }
+                              }}
+                            >
+                              {options.map((opt) => (
+                                <MenuItem key={opt} value={opt}>{String(opt)}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      );
+                    }
 
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Location/Address *"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  required
-                  helperText="This is used for duplicate detection"
-                  size="small"
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description *"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  multiline
-                  rows={2}
-                  required
-                  size="small"
-                />
-              </Grid>
-
-              {/* Property Details */}
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mt: 0.5 }}>
-                  Property Details
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  label="Price"
-                  value={formData.price}
-                  onChange={(e) => handleInputChange('price', e.target.value)}
-                  placeholder="e.g., $15,000/month"
-                  size="small"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Property Type</InputLabel>
-                  <Select
-                    value={formData.property_type}
-                    label="Property Type"
-                    onChange={(e) => handleInputChange('property_type', e.target.value)}
-                  >
-                    {propertyTypes.map(type => (
-                      <MenuItem key={type} value={type}>{type}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  label="Square Feet"
-                  value={formData.square_feet}
-                  onChange={(e) => handleInputChange('square_feet', e.target.value)}
-                  placeholder="e.g., 5,000"
-                  size="small"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Bedrooms"
-                  value={formData.bedrooms}
-                  onChange={(e) => handleInputChange('bedrooms', e.target.value)}
-                  placeholder="e.g., 3 or N/A"
-                  size="small"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Bathrooms"
-                  value={formData.bathrooms}
-                  onChange={(e) => handleInputChange('bathrooms', e.target.value)}
-                  placeholder="e.g., 2"
-                  size="small"
-                />
-              </Grid>
-
-              {/* Status field (only for edit mode) */}
-              {mode === 'edit' && (
-                <Grid item xs={12} md={6}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={formData.status}
-                      label="Status"
-                      onChange={(e) => handleInputChange('status', e.target.value)}
-                    >
-                      {statusOptions.map(status => (
-                        <MenuItem key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              )}
-
-              {/* Additional Information */}
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mt: 0.5 }}>
-                  Additional Information
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Property URL"
-                  value={formData.property_url}
-                  onChange={(e) => handleInputChange('property_url', e.target.value)}
-                  placeholder="https://example.com/property"
-                  size="small"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Email Source"
-                  value={formData.email_source}
-                  onChange={(e) => handleInputChange('email_source', e.target.value)}
-                  placeholder="e.g., commercial@realestate.com"
-                  size="small"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Email Subject"
-                  value={formData.email_subject}
-                  onChange={(e) => handleInputChange('email_subject', e.target.value)}
-                  placeholder="e.g., New Property Listing"
-                  size="small"
-                />
-              </Grid>
-
-              {/* Image URLs */}
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mt: 0.5 }}>
-                  Property Images
-                </Typography>
-                
-                {imageUrls.map((url, index) => (
-                  <Box key={index} sx={{ display: 'flex', gap: 0.5, mb: 0.5 }}>
-                    <TextField
-                      fullWidth
-                      label={`Image URL ${index + 1}`}
-                      value={url}
-                      onChange={(e) => handleImageUrlChange(index, e.target.value)}
-                      placeholder="https://images.unsplash.com/photo-..."
-                      size="small"
-                    />
-                    {imageUrls.length > 1 && (
-                      <IconButton
-                        onClick={() => removeImageUrl(index)}
-                        color="error"
-                        sx={{ alignSelf: 'center' }}
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    )}
-                  </Box>
-                ))}
-                
-                <Button
-                  startIcon={<AddIcon />}
-                  onClick={addImageUrl}
-                  variant="outlined"
-                  size="small"
-                  sx={{ mt: 0.5 }}
-                >
-                  Add Another Image
-                </Button>
-              </Grid>
+                    // default to text field
+                    return (
+                      <Grid item xs={12} sm={field.ui?.multiline ? 12 : 6} key={field.name}>
+                        <TextField
+                          fullWidth
+                          label={`${field.label}${field.required ? ' *' : ''}`}
+                          value={formData[field.name] ?? ''}
+                          onChange={(e) => handleInputChange(field.name, e.target.value)}
+                          required={Boolean(field.required)}
+                          size="small"
+                          placeholder={field.placeholder}
+                          multiline={Boolean(field.ui?.multiline)}
+                          rows={field.ui?.rows || (field.ui?.multiline ? 2 : undefined)}
+                          helperText={field.helperText}
+                          margin="dense"
+                          InputProps={{
+                            sx: { '& .MuiInputBase-input': { py: 0.5 } }
+                          }}
+                        />
+                      </Grid>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
 
               {/* Submit Button */}
               <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 0.5 }}>
+                <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'flex-end', mt: 0.125 }}>
                   <Button
                     variant="outlined"
                     size="small"
