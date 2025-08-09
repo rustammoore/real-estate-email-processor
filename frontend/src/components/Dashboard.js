@@ -10,8 +10,7 @@ import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
 import api from '../services/api';
 import { useSearch } from '../contexts/SearchContext';
-import { useArchivedCount } from '../hooks/useArchivedCount';
-import { useFollowUpCount } from '../hooks/useFollowUpCount';
+import { useCounts } from '../contexts/CountsContext';
 
 function Dashboard() {
   const [stats, setStats] = useState({
@@ -25,8 +24,7 @@ function Dashboard() {
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
   const { filterProperties, searchState, updateDynamicFields } = useSearch();
-  const { count: archivedCount } = useArchivedCount();
-  const { followUpCounts } = useFollowUpCount();
+  const { counts } = useCounts();
 
   const sortPropertiesByRecentChange = (props = []) => {
     return props
@@ -96,31 +94,14 @@ function Dashboard() {
       const properties = await api.getProperties();
       const activeProperties = properties.filter(p => p.status === 'active');
       
-      // Get pending review count
-      let pendingReviewCount = 0;
-      try {
-        const pendingProperties = await api.getPendingReviewProperties();
-        pendingReviewCount = pendingProperties.length;
-      } catch (error) {
-        console.error('Error fetching pending review count:', error);
-      }
-      
-      // Get deleted properties count
-      let deletedPropertiesCount = 0;
-      try {
-        const deletedProperties = await api.getDeletedProperties();
-        deletedPropertiesCount = deletedProperties.length;
-      } catch (error) {
-        console.error('Error fetching deleted properties count:', error);
-      }
       // Determine most recently changed properties by updatedAt (fallback to createdAt)
       const recentProperties = getRecentTop10(properties);
 
       setStats({
         totalProperties: properties.length,
         activeProperties: activeProperties.length,
-        pendingReviewCount,
-        deletedPropertiesCount,
+        pendingReviewCount: 0,
+        deletedPropertiesCount: 0,
         recentProperties
       });
       setAllProperties(properties);
@@ -193,7 +174,7 @@ function Dashboard() {
             <ClockIcon className="w-4 h-4 text-indigo-500 mr-2" />
             <div>
               <div className="text-lg font-semibold text-gray-900 leading-tight">
-                {followUpCounts?.total || 0}
+                {counts?.followUps?.total || 0}
               </div>
               <div className="text-[10px] text-gray-500">
                 Follow Ups
@@ -208,7 +189,7 @@ function Dashboard() {
             <ClockIcon className="w-4 h-4 text-yellow-500 mr-2" />
             <div>
               <div className="text-lg font-semibold text-gray-900 leading-tight">
-                {stats.pendingReviewCount}
+                {counts?.pendingReview || 0}
               </div>
               <div className="text-[10px] text-gray-500">
                 Pending Review
@@ -223,7 +204,7 @@ function Dashboard() {
             <ArchiveBoxIcon className="w-4 h-4 text-gray-700 mr-2" />
             <div>
               <div className="text-lg font-semibold text-gray-900 leading-tight">
-                {archivedCount || 0}
+                {counts?.archived || 0}
               </div>
               <div className="text-[10px] text-gray-500">
                 Archived
@@ -238,7 +219,7 @@ function Dashboard() {
             <BuildingOfficeIcon className="w-4 h-4 text-red-500 mr-2" />
             <div>
               <div className="text-lg font-semibold text-gray-900 leading-tight">
-                {stats.deletedPropertiesCount}
+                {counts?.deleted || 0}
               </div>
               <div className="text-[10px] text-gray-500">
                 Deleted Properties
