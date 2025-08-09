@@ -196,14 +196,19 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                     if (field.type === 'images') {
                       return (
                         <Grid item xs={12} key={field.name}>
-                          <ImageManager
-                            mode={mode === 'create' ? 'create' : 'edit'}
-                            value={formData.images}
-                            onChange={(imgs) => setFormData((prev) => ({ ...prev, images: imgs }))}
-                            columns={3}
-                            tileHeight={96}
-                            dropzoneSize={160}
-                          />
+                          <Box sx={{ mb: 0.5 }}>
+                            <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
+                              Property Images
+                            </Typography>
+                            <ImageManager
+                              mode={mode === 'create' ? 'create' : 'edit'}
+                              value={formData.images}
+                              onChange={(imgs) => setFormData((prev) => ({ ...prev, images: imgs }))}
+                              columns={3}
+                              tileHeight={240}
+                              dropzoneSize={160}
+                            />
+                          </Box>
                         </Grid>
                       );
                     }
