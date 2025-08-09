@@ -1,28 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   Container,
-  Grid,
   Typography,
-  Button,
-  TextField,
   Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
+  Button
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import SearchIcon from '@mui/icons-material/Search';
 import api from '../services/api';
 import { useSearch } from '../contexts/SearchContext';
 import PropertyGrid from './PropertyGrid';
+import SearchFilter from './ui/SearchFilter';
 
 function PropertyList() {
-  const { updateDynamicFields } = useSearch();
+  const { updateDynamicFields, filterProperties } = useSearch();
   const [properties, setProperties] = useState([]);
-  const [filteredProperties, setFilteredProperties] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
@@ -37,10 +28,6 @@ function PropertyList() {
     }
   }, [properties, updateDynamicFields]);
 
-  useEffect(() => {
-    filterProperties();
-  }, [properties, searchTerm, statusFilter]);
-
   const fetchProperties = async () => {
     try {
       const data = await api.getProperties();
@@ -50,26 +37,6 @@ function PropertyList() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterProperties = () => {
-    let filtered = properties;
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(property =>
-        property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        property.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        property.email_source.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(property => property.status === statusFilter);
-    }
-
-    setFilteredProperties(filtered);
   };
 
   const handleDelete = async (propertyId) => {
@@ -94,15 +61,6 @@ function PropertyList() {
     setProperties(prev => prev.map(p => p.id === updatedProperty.id ? updatedProperty : p));
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return 'success';
-      case 'sold': return 'error';
-      case 'pending': return 'warning';
-      default: return 'default';
-    }
-  };
-
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -111,52 +69,27 @@ function PropertyList() {
     );
   }
 
+  const filtered = filterProperties(properties);
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" gutterBottom>
         Property Listings
       </Typography>
 
-      {/* Filters */}
+      {/* Centralized Search & Filters */}
       <Box sx={{ mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Search properties"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={statusFilter}
-                label="Status"
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="sold">Sold</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Typography variant="body2" color="textSecondary">
-              {filteredProperties.length} properties found
-            </Typography>
-          </Grid>
-        </Grid>
+        <SearchFilter properties={properties} showAdvanced={true} />
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="body2" color="textSecondary">
+            {filtered.length} {filtered.length === 1 ? 'property' : 'properties'} found
+          </Typography>
+        </Box>
       </Box>
 
       {/* Property Grid using unified PropertyCard actions */}
       <PropertyGrid 
-        properties={filteredProperties}
+        properties={filtered}
         loading={loading}
         onDelete={handleDelete}
         onPropertyUpdate={handlePropertyUpdate}
@@ -165,7 +98,7 @@ function PropertyList() {
         variant="outlined"
       />
 
-      {filteredProperties.length === 0 && (
+      {filtered.length === 0 && (
         <Box textAlign="center" sx={{ mt: 4 }}>
           <Typography variant="h6" color="textSecondary">
             No properties found

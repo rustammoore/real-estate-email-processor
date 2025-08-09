@@ -9,7 +9,8 @@ import {
   Typography,
   IconButton,
   Grid,
-  TextField
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import api from '../../services/api';
@@ -19,6 +20,7 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
   const [showDialog, setShowDialog] = useState(false);
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [customDate, setCustomDate] = useState('');
+  const [daysInput, setDaysInput] = useState('');
 
   const handleClose = () => {
     setShowDialog(false);
@@ -62,6 +64,27 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
       setCustomDate('');
     } catch (error) {
       console.error('Error setting custom follow-up:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetDaysFollowUp = async () => {
+    const days = parseInt(daysInput, 10);
+    if (isNaN(days)) return;
+    try {
+      setLoading(true);
+      await api.setFollowUp(property.id, days);
+      if (onFollowUpSet) {
+        onFollowUpSet(property.id, days);
+      }
+      if (onUpdate) {
+        onUpdate();
+      }
+      setShowDialog(false);
+      setDaysInput('');
+    } catch (error) {
+      console.error('Error setting follow-up days:', error);
     } finally {
       setLoading(false);
     }
@@ -133,32 +156,32 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
         </svg>
       </IconButton>
 
-      <Dialog open={showDialog} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
+      <Dialog open={showDialog} onClose={handleClose} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ py: 1.25, px: 1.5 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">Set Follow-up</Typography>
+            <Typography variant="subtitle1">Set Follow-up</Typography>
             <IconButton onClick={handleClose} size="small">
               <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2}>
+        <DialogContent dividers sx={{ p: 1.5 }}>
+          <Grid container spacing={1}>
             <Grid item xs={4}>
               <Button
                 variant="outlined"
                 fullWidth
-                size="large"
+                size="small"
                 onClick={() => handleSetFollowUp(30)}
                 disabled={loading}
                 sx={{ 
-                  py: 2,
+                  py: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.5
                 }}
               >
-                <Typography variant="h6">30</Typography>
+                <Typography variant="body2">30</Typography>
                 <Typography variant="caption">days</Typography>
               </Button>
             </Grid>
@@ -166,17 +189,17 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
               <Button
                 variant="outlined"
                 fullWidth
-                size="large"
+                size="small"
                 onClick={() => handleSetFollowUp(60)}
                 disabled={loading}
                 sx={{ 
-                  py: 2,
+                  py: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.5
                 }}
               >
-                <Typography variant="h6">60</Typography>
+                <Typography variant="body2">60</Typography>
                 <Typography variant="caption">days</Typography>
               </Button>
             </Grid>
@@ -184,17 +207,17 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
               <Button
                 variant="outlined"
                 fullWidth
-                size="large"
+                size="small"
                 onClick={() => handleSetFollowUp(90)}
                 disabled={loading}
                 sx={{ 
-                  py: 2,
+                  py: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.5
                 }}
               >
-                <Typography variant="h6">90</Typography>
+                <Typography variant="body2">90</Typography>
                 <Typography variant="caption">days</Typography>
               </Button>
             </Grid>
@@ -202,17 +225,17 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
               <Button
                 variant="outlined"
                 fullWidth
-                size="large"
+                size="small"
                 onClick={() => handleSetFollowUp(180)}
                 disabled={loading}
                 sx={{ 
-                  py: 2,
+                  py: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.5
                 }}
               >
-                <Typography variant="h6">6</Typography>
+                <Typography variant="body2">6</Typography>
                 <Typography variant="caption">months</Typography>
               </Button>
             </Grid>
@@ -220,17 +243,17 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
               <Button
                 variant="outlined"
                 fullWidth
-                size="large"
+                size="small"
                 onClick={() => handleSetFollowUp(365)}
                 disabled={loading}
                 sx={{ 
-                  py: 2,
+                  py: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.5
                 }}
               >
-                <Typography variant="h6">12</Typography>
+                <Typography variant="body2">12</Typography>
                 <Typography variant="caption">months</Typography>
               </Button>
             </Grid>
@@ -238,27 +261,49 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
               <Button
                 variant="outlined"
                 fullWidth
-                size="large"
+                size="small"
                 onClick={() => setShowCustomDate(!showCustomDate)}
                 disabled={loading}
                 sx={{ 
-                  py: 2,
+                  py: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.5
                 }}
               >
-                <Typography variant="h6">📅</Typography>
+                <Typography variant="body2">📅</Typography>
                 <Typography variant="caption">Custom</Typography>
               </Button>
             </Grid>
           </Grid>
 
+          {/* Quick numeric days input */}
+          <Box mt={1.5} display="flex" gap={1} alignItems="center">
+            <TextField
+              type="number"
+              size="small"
+              label="Days from now"
+              value={daysInput}
+              onChange={(e) => setDaysInput(e.target.value)}
+              inputProps={{ inputMode: 'numeric', min: -3650, max: 3650, step: 1 }}
+              sx={{ flex: 1 }}
+            />
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleSetDaysFollowUp}
+              disabled={loading || daysInput === '' || isNaN(parseInt(daysInput, 10))}
+            >
+              Set
+            </Button>
+          </Box>
+
           {showCustomDate && (
-            <Box mt={2}>
+            <Box mt={1.5}>
               <TextField
                 type="date"
                 fullWidth
+                size="small"
                 label="Custom Follow-up Date"
                 value={customDate}
                 onChange={(e) => setCustomDate(e.target.value)}
@@ -266,10 +311,12 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
                   shrink: true,
                 }}
                 disabled={loading}
+                helperText="You can pick from calendar or type YYYY-MM-DD"
               />
               <Button
                 variant="contained"
                 fullWidth
+                size="small"
                 onClick={handleSetCustomFollowUp}
                 disabled={!customDate || loading}
                 sx={{ mt: 1 }}
@@ -280,15 +327,15 @@ const FollowUpActions = ({ property, onUpdate, onFollowUpSet, onFollowUpRemoved 
           )}
 
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleRemoveFollowUp} color="error" disabled={loading}>
+        <DialogActions sx={{ px: 1.5, py: 1 }}>
+          <Button onClick={handleRemoveFollowUp} color="error" size="small" disabled={loading}>
             Remove Follow-up
           </Button>
-          <Button onClick={handleMarkAsFollowedUp} color="success" disabled={loading}>
+          <Button onClick={handleMarkAsFollowedUp} color="success" size="small" disabled={loading}>
             Followed Up
           </Button>
           <Box sx={{ flex: 1 }} />
-          <Button onClick={handleClose}>
+          <Button onClick={handleClose} size="small">
             Cancel
           </Button>
         </DialogActions>

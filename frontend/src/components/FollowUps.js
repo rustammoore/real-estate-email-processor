@@ -6,6 +6,7 @@ import { useSearch } from '../contexts/SearchContext';
 import api from '../services/api';
 import '../styles/FollowUps.css';
 import { Box, FormControlLabel, Switch } from '@mui/material';
+import SearchFilter from './ui/SearchFilter';
 
 const FollowUps = () => {
   const [loading, setLoading] = useState(true);
@@ -15,7 +16,7 @@ const FollowUps = () => {
   const [counts, setCounts] = useState({ due: 0, notDue: 0, total: 0 });
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
-  const { updateDynamicFields } = useSearch();
+  const { updateDynamicFields, filterProperties } = useSearch();
 
   // Toggles: default shows only regular (non-archived, non-deleted)
   const [showRegular, setShowRegular] = useState(true);
@@ -100,8 +101,8 @@ const FollowUps = () => {
   if (loading) return <LoadingSpinner />;
   if (error) return <div className="error-message">{error}</div>;
 
-  const filteredDue = followUpsDue;
-  const filteredNotDue = followUpsNotDue;
+  const filteredDue = filterProperties(followUpsDue);
+  const filteredNotDue = filterProperties(followUpsNotDue);
 
   return (
     <div className="follow-ups-container">
@@ -122,6 +123,9 @@ const FollowUps = () => {
           </span>
         </div>
       </div>
+
+      {/* Global Search & Filters */}
+      <SearchFilter properties={allFollowUps} showAdvanced={true} />
 
       {/* Toggle Row */}
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>

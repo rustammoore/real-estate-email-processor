@@ -275,11 +275,10 @@ function Dashboard() {
           </div>
         </div>
         
-        {/* Search Filter */}
+        {/* Search Filter (full with advanced filters) */}
         <SearchFilter 
-          properties={allProperties} 
-          variant="compact" 
-          showAdvanced={false} 
+          properties={allProperties}
+          showAdvanced={true}
         />
         
         {/* Property Grid */}

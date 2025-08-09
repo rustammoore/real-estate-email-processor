@@ -45,6 +45,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
 
   const [showFilters, setShowFilters] = useState(false);
   const [localSearchTerm, setLocalSearchTerm] = useState(searchState.searchTerm);
+  // Pending (local) filter state to apply on demand
+  const [pendingFilters, setPendingFilters] = useState(searchState.filters);
+  const [pendingSortBy, setPendingSortBy] = useState(searchState.sortBy);
+  const [pendingSortOrder, setPendingSortOrder] = useState(searchState.sortOrder);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
   // Update dynamic fields when properties change
   useEffect(() => {
@@ -69,15 +74,52 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   };
 
   const handleFilterChange = (field, value) => {
-    if (value === '' || value === null || value === undefined) {
-      clearFilter(field);
-    } else {
-      setFilter(field, value);
-    }
+    setPendingFilters(prev => {
+      const next = { ...prev };
+      if (value === '' || value === null || value === undefined) {
+        delete next[field];
+      } else {
+        next[field] = value;
+      }
+      return next;
+    });
+    setHasPendingChanges(true);
   };
 
+  const handleApply = () => {
+    // Remove filters that were cleared locally
+    Object.keys(searchState.filters).forEach((field) => {
+      const pendingValue = pendingFilters[field];
+      if (pendingValue === undefined || pendingValue === '' || pendingValue === null) {
+        clearFilter(field);
+      }
+    });
+    // Apply pending filters
+    Object.entries(pendingFilters).forEach(([field, value]) => {
+      if (!(value === undefined || value === '' || value === null)) {
+        setFilter(field, value);
+      }
+    });
+    // Apply sorting
+    if (pendingSortBy !== searchState.sortBy || pendingSortOrder !== searchState.sortOrder) {
+      setSort(pendingSortBy, pendingSortOrder);
+    }
+    setShowFilters(false);
+    setHasPendingChanges(false);
+  };
+
+  // Sync pending state with committed state when panel closes or committed state changes externally
+  useEffect(() => {
+    if (!showFilters) {
+      setPendingFilters(searchState.filters);
+      setPendingSortBy(searchState.sortBy);
+      setPendingSortOrder(searchState.sortOrder);
+      setHasPendingChanges(false);
+    }
+  }, [searchState.filters, searchState.sortBy, searchState.sortOrder, showFilters]);
+
   const renderFilterControl = (field) => {
-    const currentValue = searchState.filters[field.name] || '';
+    const currentValue = pendingFilters[field.name] || '';
 
     switch (field.type) {
       case 'text':
@@ -292,6 +334,16 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             )}
           </Button>
         )}
+        {showAdvanced && (
+          <Button
+            variant="contained"
+            onClick={handleApply}
+            disabled={!hasPendingChanges}
+            sx={{ minWidth: 100 }}
+          >
+            Apply
+          </Button>
+        )}
       </Box>
 
       {/* Active Filters Display */}
@@ -337,9 +389,9 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                   <FormControl size="small" fullWidth>
                     <InputLabel>Sort By</InputLabel>
                     <Select
-                      value={searchState.sortBy}
+                      value={pendingSortBy}
                       label="Sort By"
-                      onChange={(e) => setSort(e.target.value, searchState.sortOrder)}
+                      onChange={(e) => { setPendingSortBy(e.target.value); setHasPendingChanges(true); }}
                     >
                       {availableFields
                         .filter(f => f.type !== 'special' && f.type !== 'array')
@@ -355,9 +407,9 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                   <FormControl size="small" fullWidth>
                     <InputLabel>Order</InputLabel>
                     <Select
-                      value={searchState.sortOrder}
+                      value={pendingSortOrder}
                       label="Order"
-                      onChange={(e) => setSort(searchState.sortBy, e.target.value)}
+                      onChange={(e) => { setPendingSortOrder(e.target.value); setHasPendingChanges(true); }}
                     >
                       <MenuItem value="asc">Ascending</MenuItem>
                       <MenuItem value="desc">Descending</MenuItem>
@@ -389,10 +441,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
           </Grid>
 
           <Box display="flex" justifyContent="flex-end" mt={2} gap={1}>
-            <Button onClick={clearAllFilters} variant="outlined">
+            <Button
+              onClick={() => { setPendingFilters({}); setHasPendingChanges(true); }}
+              variant="outlined"
+            >
               Clear All Filters
             </Button>
-            <Button onClick={() => setShowFilters(false)} variant="contained">
+            <Button onClick={handleApply} variant="contained" disabled={!hasPendingChanges}>
               Apply Filters
             </Button>
           </Box>
