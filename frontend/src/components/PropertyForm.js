@@ -182,13 +182,13 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
       )}
 
       <Card>
-        <CardContent sx={{ py: 0.25, px: 1.25 }}>
+        <CardContent sx={{ py: 0.25, px: 1 }}>
           <form onSubmit={handleSubmit}>
-            <Grid container spacing={0.5}>
+            <Grid container spacing={0.25}>
               {Object.entries(fieldsBySection).map(([sectionName, fields]) => (
                 <React.Fragment key={sectionName}>
                   <Grid item xs={12}>
-                    <Typography variant="overline" sx={{ fontWeight: 'bold', color: 'text.secondary', letterSpacing: 0.5, mt: sectionName === PROPERTY_SECTIONS.BASIC ? 0 : 0.25, mb: 0.25 }}>
+                    <Typography variant="overline" sx={{ fontWeight: 'bold', color: 'text.secondary', letterSpacing: 0.5, lineHeight: 1, fontSize: '0.75rem', mt: sectionName === PROPERTY_SECTIONS.BASIC ? 0 : 0.25, mb: 0.25 }}>
                       {sectionName}
                     </Typography>
                   </Grid>
@@ -212,7 +212,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                       const options = getEnumOptions(field.name);
                       return (
                         <Grid item xs={12} sm={6} key={field.name}>
-                          <FormControl fullWidth size="small" margin="dense">
+                          <FormControl fullWidth size="small" margin="dense" sx={{ mb: 0.5 }}>
                             <InputLabel>{field.label}</InputLabel>
                             <Select
                               value={formData[field.name] || ''}
@@ -248,6 +248,8 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                           rows={field.ui?.rows || (field.ui?.multiline ? 2 : undefined)}
                           helperText={field.helperText}
                           margin="dense"
+                          sx={{ mb: 0.5 }}
+                          FormHelperTextProps={{ sx: { mt: 0.25 } }}
                           InputProps={{
                             sx: { '& .MuiInputBase-input': { py: 0.5 } }
                           }}
