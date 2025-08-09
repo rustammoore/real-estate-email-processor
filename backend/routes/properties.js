@@ -245,4 +245,134 @@ router.delete('/:id/permanent', protect, async (req, res) => {
   }
 });
 
+// Pending review: list ALL pending properties regardless of deleted flag
+router.get('/pending-review/all', optionalAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 1000 } = req.query;
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 1000, 1), 2000);
+
+    const filter = { status: 'pending' };
+
+    const query = Property.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((parsedPage - 1) * parsedLimit)
+      .limit(parsedLimit)
+      .select('-__v')
+      .lean();
+
+    const [rawItems, total] = await Promise.all([
+      query,
+      Property.countDocuments(filter)
+    ]);
+
+    const items = rawItems.map((doc) => {
+      const { _id, ...rest } = doc;
+      return { id: String(_id || rest.id), ...rest };
+    });
+
+    res.json({
+      items,
+      page: parsedPage,
+      limit: parsedLimit,
+      total,
+      totalPages: Math.ceil(total / parsedLimit)
+    });
+  } catch (error) {
+    console.error('Error fetching pending review properties:', error);
+    res.status(500).json({ error: 'Failed to fetch pending review properties' });
+  }
+});
+
+// Pending review: approve duplicate (promote one, demote the other)
+router.post('/pending-review/:duplicateId/approve', protect, async (req, res) => {
+  try {
+    const { originalId, promote = 'duplicate' } = req.body || {};
+    const { duplicateId } = req.params;
+
+    if (!originalId) {
+      return res.status(400).json({ error: 'originalId is required' });
+    }
+
+    const [duplicate, original] = await Promise.all([
+      Property.findById(duplicateId),
+      Property.findById(originalId)
+    ]);
+
+    if (!duplicate || !original) {
+      return res.status(404).json({ error: 'Duplicate or original property not found' });
+    }
+
+    // Validate relation when promoting duplicate
+    if (promote === 'duplicate') {
+      const dupOf = String(duplicate.duplicate_of || '');
+      if (dupOf && dupOf !== String(original._id)) {
+        return res.status(400).json({ error: 'Duplicate does not reference the provided original property' });
+      }
+    }
+
+    let promoted, demoted;
+    if (promote === 'duplicate') {
+      // Promote duplicate to active, clear duplicate_of, ensure not deleted
+      duplicate.status = 'active';
+      duplicate.deleted = false;
+      duplicate.archived = false;
+      duplicate.duplicate_of = undefined;
+      promoted = await duplicate.save();
+
+      // Demote original: pending review but in deleted bucket
+      original.status = 'pending';
+      original.deleted = true;
+      demoted = await original.save();
+    } else if (promote === 'original') {
+      // Promote original to active
+      original.status = 'active';
+      original.deleted = false;
+      original.archived = false;
+      const savedOriginal = await original.save();
+
+      // Demote duplicate to pending + deleted, reference original
+      duplicate.status = 'pending';
+      duplicate.deleted = true;
+      duplicate.duplicate_of = savedOriginal._id;
+      const savedDuplicate = await duplicate.save();
+
+      promoted = savedOriginal;
+      demoted = savedDuplicate;
+    } else {
+      return res.status(400).json({ error: "Invalid 'promote' value. Use 'duplicate' or 'original'" });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Duplicate approval processed',
+      promoted,
+      demoted,
+    });
+  } catch (error) {
+    console.error('Error approving duplicate:', error);
+    return res.status(500).json({ error: 'Failed to approve duplicate' });
+  }
+});
+
+// Pending review: reject duplicate (archive/delete the duplicate)
+router.post('/pending-review/:duplicateId/reject', protect, async (req, res) => {
+  try {
+    const { duplicateId } = req.params;
+    const duplicate = await Property.findById(duplicateId);
+    if (!duplicate) {
+      return res.status(404).json({ error: 'Duplicate property not found' });
+    }
+
+    // Move duplicate to deleted (soft delete) and keep status as pending for traceability
+    duplicate.deleted = true;
+    const saved = await duplicate.save();
+
+    return res.json({ success: true, message: 'Duplicate rejected and moved to deleted', property: saved });
+  } catch (error) {
+    console.error('Error rejecting duplicate:', error);
+    return res.status(500).json({ error: 'Failed to reject duplicate' });
+  }
+});
+
 module.exports = router; 

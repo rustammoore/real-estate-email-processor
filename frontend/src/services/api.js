@@ -138,8 +138,8 @@ export const getArchivedPropertiesCount = async () => {
 
 // Pending review properties API
 export const getPendingReviewProperties = async () => {
-  // Backend uses status 'pending'
-  const response = await client.get(`/properties${buildQuery({ status: 'pending', page: 1, limit: DEFAULT_LIST_LIMIT })}`);
+  // Include pending properties even if they are soft-deleted
+  const response = await client.get('/properties/pending-review/all');
   return normalizeListResponse(response.data);
 };
 
@@ -205,17 +205,16 @@ export const permanentlyDeleteProperty = async (id) => {
 };
 
 // Pending review actions (stubs)
-export const approveDuplicate = async (duplicateId, originalId) => {
-  // Backend endpoint not implemented yet.
-  // Minimal fallback: remove the duplicate so the list shrinks.
-  // When server support exists, this should merge data and delete the duplicate.
-  await permanentlyDeleteProperty(duplicateId);
-  return { success: true, message: 'Duplicate approved by removing the duplicate.' };
+export const approveDuplicate = async (duplicateId, originalId, promote = 'duplicate') => {
+  const response = await client.post(`/properties/pending-review/${duplicateId}/approve`, { originalId, promote });
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
+  return response.data;
 };
 
 export const rejectDuplicate = async (id) => {
-  // As a minimal action, treat reject as deleting the duplicate
-  return permanentlyDeleteProperty(id);
+  const response = await client.post(`/properties/pending-review/${id}/reject`);
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
+  return response.data;
 };
 
 export const getOriginalProperty = async (duplicateId) => {

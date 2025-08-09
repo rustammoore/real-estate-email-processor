@@ -27,6 +27,7 @@ import SearchFilter from './ui/SearchFilter';
 import api from '../services/api';
 import { usePendingReview } from '../hooks/usePendingReview';
 import { useSearch } from '../contexts/SearchContext';
+import BackButton from './ui/BackButton';
 
 function PendingReview() {
   const navigate = useNavigate();
@@ -62,7 +63,8 @@ function PendingReview() {
 
   const handleApprove = async (duplicateId, originalId) => {
     try {
-      await api.approveDuplicate(duplicateId, originalId);
+      // Promote duplicate by default per requirement (Approve & Replace)
+      await api.approveDuplicate(duplicateId, originalId, 'duplicate');
       setMessage('Property approved successfully!');
       fetchPendingProperties(); // Refresh the list
       fetchPendingReview(); // Refresh the count in header
@@ -107,6 +109,7 @@ function PendingReview() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <BackButton />
       <Typography variant="h4" gutterBottom>
         Pending Review Properties
       </Typography>
