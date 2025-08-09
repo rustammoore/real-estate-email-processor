@@ -323,6 +323,8 @@ router.post('/pending-review/:duplicateId/approve', protect, async (req, res) =>
       // Demote original: pending review but in deleted bucket
       original.status = 'pending';
       original.deleted = true;
+      // Link demoted original to the promoted duplicate for comparison flow
+      original.duplicate_of = promoted._id;
       demoted = await original.save();
     } else if (promote === 'original') {
       // Promote original to active

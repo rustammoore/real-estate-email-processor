@@ -63,6 +63,12 @@ function PropertyCard({
         relative overflow-visible
       `}
     >
+      {/* Deleted Ribbon */}
+      {property.deleted && (
+        <div className="absolute top-2 left-2 bg-red-600 text-white text-2xs font-bold px-2 py-0.5 rounded">
+          DELETED
+        </div>
+      )}
       {/* Property Image */}
       {images && images.length > 0 ? (
         <img

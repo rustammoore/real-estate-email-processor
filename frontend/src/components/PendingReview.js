@@ -88,7 +88,18 @@ function PendingReview() {
 
   const handleCompare = async (duplicate) => {
     try {
-      const original = await api.getOriginalProperty(duplicate.id);
+      let original;
+      try {
+        original = await api.getOriginalProperty(duplicate.id);
+      } catch (e) {
+        // If the duplicate doesn't link to original, try the inverse:
+        // If this card is actually the original demoted to pending and links to the promoted item, fetch that instead
+        if (duplicate.duplicate_of) {
+          original = await api.getProperty(duplicate.duplicate_of?._id || duplicate.duplicate_of);
+        } else {
+          throw e;
+        }
+      }
       setCompareDialog({ open: true, duplicate, original });
     } catch (error) {
       setMessage('Error loading original property: ' + error.message);
