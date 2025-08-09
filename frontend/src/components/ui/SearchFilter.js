@@ -59,7 +59,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     }
   }, [properties]);
 
-  // Debounced search
+  // Debounced search for compact/no-advanced mode only
   const debouncedSearch = React.useMemo(
     () => debounce((value) => {
       setSearchTerm(value);
@@ -70,7 +70,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setLocalSearchTerm(value);
-    debouncedSearch(value);
+    if (variant === 'compact' || !showAdvanced) {
+      // In compact mode (no Apply button), update immediately (debounced)
+      debouncedSearch(value);
+    } else {
+      // In default mode with Apply button, mark as pending and only apply on click
+      setHasPendingChanges(value !== searchState.searchTerm || hasPendingChanges);
+    }
   };
 
   const handleFilterChange = (field, value) => {
@@ -87,6 +93,10 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   };
 
   const handleApply = () => {
+    // Apply search term if changed
+    if (localSearchTerm !== searchState.searchTerm) {
+      setSearchTerm(localSearchTerm);
+    }
     // Remove filters that were cleared locally
     Object.keys(searchState.filters).forEach((field) => {
       const pendingValue = pendingFilters[field];
@@ -114,9 +124,19 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
       setPendingFilters(searchState.filters);
       setPendingSortBy(searchState.sortBy);
       setPendingSortOrder(searchState.sortOrder);
-      setHasPendingChanges(false);
+      // Keep pending flag if local search differs from committed state
+      setHasPendingChanges(localSearchTerm !== searchState.searchTerm);
     }
-  }, [searchState.filters, searchState.sortBy, searchState.sortOrder, showFilters]);
+  }, [searchState.filters, searchState.sortBy, searchState.sortOrder, searchState.searchTerm, showFilters, localSearchTerm]);
+
+  // Keep local search term in sync when committed search term changes externally (e.g., Clear All)
+  useEffect(() => {
+    if (variant === 'compact' || !showAdvanced) {
+      setLocalSearchTerm(searchState.searchTerm);
+    } else if (!showFilters) {
+      setLocalSearchTerm(searchState.searchTerm);
+    }
+  }, [searchState.searchTerm, showFilters, variant, showAdvanced]);
 
   const renderFilterControl = (field) => {
     const currentValue = pendingFilters[field.name] || '';
@@ -274,7 +294,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               <InputAdornment position="end">
                 <IconButton size="small" onClick={() => {
                   setLocalSearchTerm('');
-                  setSearchTerm('');
+                  if (variant === 'compact' || !showAdvanced) {
+                    setSearchTerm('');
+                  } else {
+                    setHasPendingChanges(searchState.searchTerm !== '');
+                  }
                 }}>
                   <ClearIcon />
                 </IconButton>
@@ -307,7 +331,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               <InputAdornment position="end">
                 <IconButton size="small" onClick={() => {
                   setLocalSearchTerm('');
-                  setSearchTerm('');
+                  if (variant === 'compact' || !showAdvanced) {
+                    setSearchTerm('');
+                  } else {
+                    setHasPendingChanges(searchState.searchTerm !== '');
+                  }
                 }}>
                   <ClearIcon />
                 </IconButton>
