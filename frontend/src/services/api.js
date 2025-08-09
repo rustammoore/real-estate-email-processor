@@ -82,11 +82,13 @@ export const addProperty = async (data) => {
 
 export const updateProperty = async (id, data) => {
   const response = await client.put(`/properties/${id}`, data);
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
   return response.data;
 };
 
 export const deleteProperty = async (id) => {
   const response = await client.delete(`/properties/${id}`);
+  try { window.dispatchEvent(new Event('property:deleted')); } catch (_) {}
   return response.data;
 };
 
@@ -161,6 +163,7 @@ export const setFollowUp = async (id, daysFromNow) => {
     lastFollowUpDate: null
   };
   const response = await client.put(`/properties/${id}`, payload);
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
   return { ...response.data.property, message: 'Follow-up set' };
 };
 
@@ -172,18 +175,21 @@ export const setFollowUpDate = async (id, isoDateString) => {
     lastFollowUpDate: null
   };
   const response = await client.put(`/properties/${id}`, payload);
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
   return { ...response.data.property, message: 'Follow-up set' };
 };
 
 export const removeFollowUp = async (id) => {
   const payload = { followUpDate: null, lastFollowUpDate: null };
   const response = await client.put(`/properties/${id}`, payload);
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
   return { ...response.data.property, message: 'Follow-up removed' };
 };
 
 export const markAsFollowedUp = async (id) => {
   const payload = { lastFollowUpDate: new Date().toISOString() };
   const response = await client.put(`/properties/${id}`, payload);
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
   return { ...response.data.property, message: 'Marked as followed up' };
 };
 
