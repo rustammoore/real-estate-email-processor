@@ -18,18 +18,29 @@ export function CountsProvider({ children }) {
       setLoading(true);
       setError(null);
 
-      const [followUpsResp, pendingAll, archivedResp, deletedList] = await Promise.all([
-        api.fetchFollowUps(),
+      const [allProps, pendingAll, archivedResp, deletedList] = await Promise.all([
+        api.getProperties({ page: 1, limit: 1000 }),
         api.getPendingReviewProperties(),
         api.getArchivedPropertiesCount(),
         api.getDeletedProperties(),
       ]);
 
+      // Compute follow-ups from a consistent global definition: non-archived, non-deleted
+      const now = new Date();
+      const endOfToday = new Date(now);
+      endOfToday.setHours(23, 59, 59, 999);
+      const isRegular = (p) => !p.archived && !p.deleted;
+      const withFollowUps = (Array.isArray(allProps) ? allProps : []).filter(
+        (p) => isRegular(p) && Boolean(p.followUpDate)
+      );
+      const due = withFollowUps.filter((p) => new Date(p.followUpDate) <= endOfToday);
+      const notDue = withFollowUps.filter((p) => new Date(p.followUpDate) > endOfToday);
+
       // For header/menu: pending review count excludes deleted by default
       const pendingVisible = Array.isArray(pendingAll) ? pendingAll.filter((p) => !p.deleted) : [];
 
       setCounts({
-        followUps: followUpsResp?.counts || { due: 0, notDue: 0, total: 0 },
+        followUps: { due: due.length, notDue: notDue.length, total: withFollowUps.length },
         pendingReview: pendingVisible.length,
         archived: archivedResp?.count || 0,
         deleted: Array.isArray(deletedList) ? deletedList.length : 0,
