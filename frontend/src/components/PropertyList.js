@@ -10,6 +10,8 @@ import api from '../services/api';
 import { useSearch } from '../contexts/SearchContext';
 import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
+import ConfirmationDialog from './ui/ConfirmationDialog';
+import { useToast } from '../contexts/ToastContext';
 
 function PropertyList() {
   const { updateDynamicFields, filterProperties } = useSearch();
@@ -21,6 +23,9 @@ function PropertyList() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedProperties, setDeletedProperties] = useState([]);
   const [loadingDeleted, setLoadingDeleted] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     fetchProperties();
@@ -62,16 +67,23 @@ function PropertyList() {
     }
   };
 
-  const handleDelete = async (propertyId) => {
-    if (window.confirm('Are you sure you want to delete this property?')) {
-      try {
-        await api.deleteProperty(propertyId);
-        setMessage('Property deleted successfully!');
-        setProperties(prev => prev.filter(p => p.id !== propertyId));
-        fetchProperties();
-      } catch (error) {
-        setMessage('Error deleting property: ' + error.message);
-      }
+  const handleDelete = (propertyId) => {
+    setConfirmDeleteId(propertyId);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    try {
+      setDeleting(true);
+      await api.deleteProperty(confirmDeleteId);
+      showSuccess('Property deleted', 'Success');
+      setProperties(prev => prev.filter(p => p.id !== confirmDeleteId));
+      fetchProperties();
+    } catch (error) {
+      showError(error.message || 'Error deleting property', 'Error');
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -168,6 +180,18 @@ function PropertyList() {
         onUpdate={fetchProperties}
         showFollowUpBadge={true}
         variant="outlined"
+      />
+
+      <ConfirmationDialog
+        open={Boolean(confirmDeleteId)}
+        title="Delete Property"
+        message="Are you sure you want to delete this property? This action can be undone from Deleted items."
+        confirmText="Delete"
+        cancelText="Cancel"
+        severity="error"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+        loading={deleting}
       />
 
       {visible.length === 0 && (

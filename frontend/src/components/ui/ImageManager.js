@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -39,6 +39,13 @@ export default function ImageManager({
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const isReadOnly = mode === 'view';
+
+  // Keep internal state in sync with parent when value changes in view mode
+  useEffect(() => {
+    if (isReadOnly) {
+      setUrls(initial.length ? initial : ['']);
+    }
+  }, [initial, isReadOnly]);
 
   const commit = (next) => {
     const cleaned = sanitizeImages(next);

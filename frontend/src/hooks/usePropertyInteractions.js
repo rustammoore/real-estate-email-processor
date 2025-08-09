@@ -4,7 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 
 export const usePropertyInteractions = (property, onUpdate) => {
   const [loading, setLoading] = useState(false);
-  const { showToast } = useToast();
+  const { showToast, showError } = useToast();
 
   const handleInteraction = async (action, actionFunction, successMessage) => {
     if (loading) return;
@@ -12,7 +12,16 @@ export const usePropertyInteractions = (property, onUpdate) => {
     setLoading(true);
     try {
       const result = await actionFunction(property.id);
-      showToast(result.message || successMessage, 'success');
+      // Build consistent blue (info) toast in top-right
+      let message = result.message || successMessage || 'Updated';
+      if (action === 'like' && typeof result.liked === 'boolean') {
+        message = result.liked ? 'Liked property' : 'Removed Like';
+      } else if (action === 'love' && typeof result.loved === 'boolean') {
+        message = result.loved ? 'Loved property' : 'Removed Love';
+      } else if (action === 'archive' && typeof result.archived === 'boolean') {
+        message = result.archived ? 'Archived property' : 'Unarchived property';
+      }
+      showToast({ title: 'Action', message, severity: 'info', autoHideDuration: 3500 });
       
       // Update the property data
       if (onUpdate) {
@@ -31,7 +40,7 @@ export const usePropertyInteractions = (property, onUpdate) => {
       
       return result;
     } catch (error) {
-      showToast(error.message || 'Action failed', 'error');
+      showError(error.message || 'Action failed', 'Error');
       throw error;
     } finally {
       setLoading(false);
@@ -48,8 +57,8 @@ export const usePropertyInteractions = (property, onUpdate) => {
     setLoading(true);
     try {
       const result = await setRating(property.id, rating);
-      const message = rating > 0 ? `Property rated ${rating}/10` : 'Property rating removed';
-      showToast(result.message || message, 'success');
+      const message = rating > 0 ? `Rated property ${rating}/10` : 'Removed rating';
+      showToast({ title: 'Action', message, severity: 'info', autoHideDuration: 3500 });
       
       // Update the property data
       if (onUpdate) {
@@ -61,7 +70,7 @@ export const usePropertyInteractions = (property, onUpdate) => {
       
       return result;
     } catch (error) {
-      showToast(error.message || 'Failed to set rating', 'error');
+      showError(error.message || 'Failed to set rating', 'Error');
       throw error;
     } finally {
       setLoading(false);

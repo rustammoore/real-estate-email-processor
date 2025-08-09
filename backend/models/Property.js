@@ -37,6 +37,10 @@ const propertySchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  state: {
+    type: String,
+    trim: true
+  },
   square_feet: {
     type: String,
     trim: true
@@ -70,6 +74,10 @@ const propertySchema = new mongoose.Schema({
     trim: true
   },
   other: {
+    type: String,
+    trim: true
+  },
+  procured: {
     type: String,
     trim: true
   },

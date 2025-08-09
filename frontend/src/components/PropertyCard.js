@@ -12,6 +12,8 @@ import FollowUpBadge from './ui/FollowUpBadge';
 import FollowUpActions from './ui/FollowUpActions';
 import { parseImages, formatDate, formatPrice } from '../utils';
 import { UI_CONSTANTS } from '../constants';
+import ConfirmationDialog from './ui/ConfirmationDialog';
+import { useToast } from '../contexts/ToastContext';
 
 function PropertyCard({ 
   property, 
@@ -27,23 +29,29 @@ function PropertyCard({
   onUpdate = null
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
   // Parse images using centralized utility
   const images = parseImages(property.images);
 
-  const handleDelete = async () => {
-    if (onDelete) {
-      onDelete(property.id);
-    } else {
-      // Fallback for when no onDelete handler is provided
-      if (window.confirm('Are you sure you want to delete this property?')) {
-        setIsDeleting(true);
-        // Note: This fallback should ideally be handled by the parent component
-        // For now, we'll just show an error message
-        console.warn('No delete handler provided for PropertyCard');
-        setIsDeleting(false);
+  const handleDelete = () => {
+    setConfirmOpen(true);
+  };
+  const handleCancelDelete = () => setConfirmOpen(false);
+  const handleConfirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      if (onDelete) {
+        await onDelete(property.id);
       }
+      showSuccess('Property deleted', 'Success');
+    } catch (err) {
+      showError(err.message || 'Error deleting property', 'Error');
+    } finally {
+      setIsDeleting(false);
+      setConfirmOpen(false);
     }
   };
 
@@ -242,6 +250,19 @@ function PropertyCard({
           </button>
         </div>
       )}
+
+      {/* Confirm Delete dialog for card */}
+      <ConfirmationDialog
+        open={confirmOpen}
+        title="Delete Property"
+        message="Are you sure you want to delete this property? This action can be undone from Deleted items."
+        confirmText="Delete"
+        cancelText="Cancel"
+        severity="error"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        loading={isDeleting}
+      />
     </div>
   );
 }

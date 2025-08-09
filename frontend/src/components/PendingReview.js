@@ -30,18 +30,23 @@ import api from '../services/api';
 import { usePendingReview } from '../hooks/usePendingReview';
 import { useSearch } from '../contexts/SearchContext';
 import BackButton from './ui/BackButton';
+import ConfirmationDialog from './ui/ConfirmationDialog';
+import { useToast } from '../contexts/ToastContext';
 
 function PendingReview() {
   const navigate = useNavigate();
   const [pendingProperties, setPendingProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [confirmRejectId, setConfirmRejectId] = useState(null);
+  const [processing, setProcessing] = useState(false);
   const [showRegular, setShowRegular] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [compareDialog, setCompareDialog] = useState({ open: false, duplicate: null, original: null });
   const { fetchPendingReview } = usePendingReview();
   const { filterProperties, updateDynamicFields } = useSearch();
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     fetchPendingProperties();
@@ -89,16 +94,23 @@ function PendingReview() {
     }
   };
 
-  const handleReject = async (duplicateId) => {
-    if (window.confirm('Are you sure you want to reject this duplicate property?')) {
-      try {
-        await api.rejectDuplicate(duplicateId);
-        setMessage('Property rejected successfully!');
-        fetchPendingProperties(); // Refresh the list
-        fetchPendingReview(); // Refresh the count in header
-      } catch (error) {
-        setMessage('Error rejecting property: ' + error.message);
-      }
+  const handleReject = (duplicateId) => {
+    setConfirmRejectId(duplicateId);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!confirmRejectId) return;
+    try {
+      setProcessing(true);
+      await api.rejectDuplicate(confirmRejectId);
+      showSuccess('Property rejected successfully!', 'Success');
+      fetchPendingProperties();
+      fetchPendingReview();
+    } catch (error) {
+      showError(error.message || 'Error rejecting property', 'Error');
+    } finally {
+      setProcessing(false);
+      setConfirmRejectId(null);
     }
   };
 
@@ -245,6 +257,18 @@ function PendingReview() {
             </Button>
           </Box>
         )}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(confirmRejectId)}
+        title="Reject Duplicate"
+        message="Are you sure you want to reject this duplicate property?"
+        confirmText="Reject"
+        cancelText="Cancel"
+        severity="warning"
+        onConfirm={handleConfirmReject}
+        onCancel={() => setConfirmRejectId(null)}
+        loading={processing}
       />
 
       {/* Compare Dialog */}

@@ -10,6 +10,8 @@ import FollowUpActions from './ui/FollowUpActions';
 import PropertyActions from './ui/PropertyActions';
 import ImageManager from './ui/ImageManager';
 import { normalizeImages } from '../utils/images';
+import ConfirmationDialog from './ui/ConfirmationDialog';
+import { useToast } from '../contexts/ToastContext';
 
 function PropertyDetail() {
   const { id } = useParams();
@@ -23,6 +25,9 @@ function PropertyDetail() {
   const [allProperties, setAllProperties] = useState([]);
   const [prevId, setPrevId] = useState(null);
   const [nextId, setNextId] = useState(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     fetchProperty();
@@ -64,7 +69,14 @@ function PropertyDetail() {
 
   const fetchProperty = async () => {
     try {
-      const data = await api.getProperty(id);
+      const raw = await api.getProperty(id);
+      // Compute price_per_ft for view (even if backend doesn't store it)
+      const priceNum = parseCurrencyToNumber(raw.price);
+      const sqftNum = parseCurrencyToNumber(raw.square_feet);
+      const pricePerFt = (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0)
+        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(priceNum / sqftNum)
+        : '';
+      const data = { ...raw, price_per_ft: raw.price_per_ft || pricePerFt };
       setProperty(data);
       // Initialize from schema-visible fields for edit context
       const fields = getFieldsForContext(PROPERTY_CONTEXTS.EDIT);
@@ -95,16 +107,20 @@ function PropertyDetail() {
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this property?')) {
-      try {
-        await api.deleteProperty(id);
-        // Broadcast delete so dashboard and lists can react immediately
-        window.dispatchEvent(new CustomEvent('property:deleted', { detail: { id } }));
-        navigate('/properties');
-      } catch (error) {
-        setMessage('Error deleting property: ' + error.message);
-      }
+  const handleOpenDelete = () => setConfirmDeleteOpen(true);
+  const handleCloseDelete = () => setConfirmDeleteOpen(false);
+  const handleConfirmDelete = async () => {
+    try {
+      setDeleting(true);
+      await api.deleteProperty(id);
+      try { window.dispatchEvent(new CustomEvent('property:deleted', { detail: { id } })); } catch (_) {}
+      showSuccess('Property deleted', 'Success');
+      navigate('/properties');
+    } catch (error) {
+      showError(error.message || 'Error deleting property', 'Error');
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteOpen(false);
     }
   };
 
@@ -129,6 +145,29 @@ function PropertyDetail() {
     }));
   };
 
+  // Helpers for currency and computed price_per_ft in edit mode
+  const parseCurrencyToNumber = (value) => {
+    if (value === null || value === undefined) return NaN;
+    const cleaned = String(value).replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleaned);
+    return Number.isFinite(num) ? num : NaN;
+  };
+
+  useEffect(() => {
+    if (!editing) return;
+    const priceNum = parseCurrencyToNumber(formData.price);
+    const sqftNum = parseCurrencyToNumber(formData.square_feet);
+    if (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0) {
+      const ppf = priceNum / sqftNum;
+      const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(ppf);
+      setFormData((prev) => (
+        prev.price_per_ft === formatted ? prev : { ...prev, price_per_ft: formatted }
+      ));
+    } else if (formData.price_per_ft) {
+      setFormData((prev) => ({ ...prev, price_per_ft: '' }));
+    }
+  }, [editing, formData.price, formData.square_feet]);
+
   if (loading) {
     return (
       <PropertyPageLayout title="View Property" onBack={() => navigate('/properties')}>
@@ -146,6 +185,7 @@ function PropertyDetail() {
   }
 
   return (
+    <>
     <PropertyPageLayout
       title={editing ? 'Edit Property' : 'View Property'}
       onBack={() => navigate('/properties')}
@@ -177,7 +217,7 @@ function PropertyDetail() {
               <PropertyActions property={property} onUpdate={fetchProperty} />
               {/* Delete */}
               <button
-                onClick={handleDelete}
+                onClick={handleOpenDelete}
                 title="Delete Property"
                 className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-md flex items-center justify-center transition-colors"
               >
@@ -267,7 +307,7 @@ function PropertyDetail() {
                     if (field.type === 'enum') {
                       const options = getEnumOptions(field.name);
                       return (
-                         <Grid item xs={12} sm={field.name === 'description' ? 12 : 6} key={field.name}>
+                         <Grid item xs={12} sm={field.ui?.grid?.sm || (field.name === 'description' ? 12 : 6)} key={field.name}>
                           <FormControl fullWidth size="small" margin="dense">
                             <InputLabel>{field.label}</InputLabel>
                             <Select
@@ -285,13 +325,13 @@ function PropertyDetail() {
                       );
                     }
                     return (
-                       <Grid item xs={12} sm={field.name === 'description' ? 12 : 6} key={field.name}>
+                       <Grid item xs={12} sm={field.ui?.grid?.sm || (field.name === 'description' ? 12 : 6)} key={field.name}>
                         <TextField
                           fullWidth
                           label={field.label}
                           value={value || ''}
                           onChange={(e) => handleInputChange(field.name, e.target.value)}
-                          disabled={!editing}
+                           disabled={!editing || field.name === 'price_per_ft'}
                           margin="dense"
                           multiline={Boolean(field.ui?.multiline) || field.name === 'description'}
                           rows={field.ui?.rows || (field.name === 'description' ? 4 : undefined)}
@@ -330,12 +370,24 @@ function PropertyDetail() {
                 const additionalFields = getFieldsForContext(editing ? PROPERTY_CONTEXTS.EDIT : PROPERTY_CONTEXTS.VIEW)
                   .filter((f) => f.section === PROPERTY_SECTIONS.ADDITIONAL && !metaFieldNames.includes(f.name));
 
+                // Ensure specific ordering in Additional Information
+                // Also place Date Received before Email Subject
+                const sortOrder = ['price', 'cap_rate', 'property_url', 'email_source', 'email_date', 'email_subject'];
+                additionalFields.sort((a, b) => {
+                  const ai = sortOrder.indexOf(a.name);
+                  const bi = sortOrder.indexOf(b.name);
+                  const av = ai === -1 ? Number.MAX_SAFE_INTEGER : ai;
+                  const bv = bi === -1 ? Number.MAX_SAFE_INTEGER : bi;
+                  if (av !== bv) return av - bv;
+                  return 0;
+                });
+
                 return (
                   <>
                     {additionalFields.map((field) => {
                       if (editing) {
-                        // Editable fields in edit context (text fields)
-                        if (field.type === 'text') {
+                        // Editable fields in edit context (text & numeric)
+                        if (field.type === 'text' || field.type === 'numeric') {
                           return (
                             <Box sx={{ mb: 1 }} key={field.name}>
                               <TextField
@@ -343,6 +395,14 @@ function PropertyDetail() {
                                 label={field.label}
                                 value={formData[field.name] ?? ''}
                                 onChange={(e) => handleInputChange(field.name, e.target.value)}
+                                onBlur={(e) => {
+                                  if (field.name === 'price') {
+                                    const cleaned = String(e.target.value).replace(/[^0-9.]/g, '');
+                                    const num = parseFloat(cleaned);
+                                    const formatted = Number.isFinite(num) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(num) : '';
+                                    handleInputChange('price', formatted);
+                                  }
+                                }}
                                 size="small"
                                 margin="dense"
                               />
@@ -354,9 +414,21 @@ function PropertyDetail() {
                       }
 
                       // View mode presentation
+                      // Single-row layout for specific fields with wrapping
+                      const isSingleRowField = ['price', 'cap_rate', 'email_source', 'email_subject'].includes(field.name);
+
                       if (field.name === 'property_url' && property.property_url) {
                         return (
-                          <Box sx={{ mb: 1 }} key={field.name}>
+                          <Box
+                            key={field.name}
+                            sx={{
+                              mb: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              flexWrap: 'wrap',
+                            }}
+                          >
                             <Typography variant="subtitle2" color="textSecondary">
                               Property URL:
                             </Typography>
@@ -364,11 +436,55 @@ function PropertyDetail() {
                               href={property.property_url}
                               target="_blank"
                               variant="outlined"
-                              fullWidth
-                              sx={{ mt: 1 }}
+                              size="small"
+                              sx={{ minWidth: 0, px: 1.25, py: 0.25 }}
                             >
-                              View Original Listing
+                              View
                             </Button>
+                          </Box>
+                        );
+                      }
+
+                      if (field.name === 'email_date' && property[field.name]) {
+                        return (
+                          <Box
+                            key={field.name}
+                            sx={{
+                              mb: 1,
+                              display: 'flex',
+                              alignItems: 'baseline',
+                              gap: 1,
+                              flexWrap: 'nowrap',
+                            }}
+                          >
+                            <Typography variant="subtitle2" color="textSecondary">
+                              {field.label}:
+                            </Typography>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-word', overflowWrap: 'anywhere', flex: 1, minWidth: 0 }}>
+                              {new Date(property[field.name]).toLocaleString()}
+                            </Typography>
+                          </Box>
+                        );
+                      }
+
+                      if (isSingleRowField) {
+                        return (
+                          <Box
+                            key={field.name}
+                            sx={{
+                              mb: 1,
+                              display: 'flex',
+                              alignItems: 'baseline',
+                              gap: 1,
+                              flexWrap: 'nowrap',
+                            }}
+                          >
+                            <Typography variant="subtitle2" color="textSecondary">
+                              {field.label}:
+                            </Typography>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-word', overflowWrap: 'anywhere', flex: 1, minWidth: 0 }}>
+                              {property[field.name] || ''}
+                            </Typography>
                           </Box>
                         );
                       }
@@ -424,17 +540,19 @@ function PropertyDetail() {
 
                 {/* Compact chips row */}
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                  {/* Liked - blue when true */}
                   <Chip
                     size="small"
                     label="Liked"
-                    color={property.liked ? 'success' : 'default'}
                     variant={property.liked ? 'filled' : 'outlined'}
+                    sx={property.liked ? { bgcolor: '#1e88e5', color: '#fff' } : {}}
                   />
+                  {/* Loved - red when true */}
                   <Chip
                     size="small"
                     label="Loved"
-                    color={property.loved ? 'success' : 'default'}
                     variant={property.loved ? 'filled' : 'outlined'}
+                    sx={property.loved ? { bgcolor: '#e53935', color: '#fff' } : {}}
                   />
                   <Chip
                     size="small"
@@ -442,16 +560,23 @@ function PropertyDetail() {
                     color={property.archived ? 'warning' : 'default'}
                     variant={property.archived ? 'filled' : 'outlined'}
                   />
-                  <Chip
-                    size="small"
-                    label={property.rating && property.rating > 0 ? `Rating ${property.rating}` : 'No rating'}
-                    color={property.rating && property.rating > 0 ? 'primary' : 'default'}
-                    variant={property.rating && property.rating > 0 ? 'filled' : 'outlined'}
-                  />
+                  {(() => {
+                    const ratingValue = Number(property.rating);
+                    const hasNumeric = Number.isFinite(ratingValue);
+                    const clamped = hasNumeric ? Math.max(0, Math.min(10, Math.round(ratingValue))) : null;
+                    const label = hasNumeric ? `Rating ${clamped}` : 'No rating';
+                    const gradient = ['#000000', '#00897B', '#009688', '#00ACC1', '#26A69A', '#42B3B3', '#5C6BC0', '#7E57C2', '#8E24AA', '#9C27B0', '#6A1B9A'];
+                    const color = hasNumeric ? gradient[clamped] : undefined;
+                    const sx = hasNumeric ? { bgcolor: color, color: '#fff' } : {};
+                    const variant = hasNumeric ? 'filled' : 'outlined';
+                    return (
+                      <Chip size="small" label={label} variant={variant} sx={sx} />
+                    );
+                  })()}
                   {'status' in property && (
                     <Chip
                       size="small"
-                      label={`Status: ${property.status}`}
+                      label={(property.status || '').toString().charAt(0).toUpperCase() + (property.status || '').toString().slice(1)}
                       color={property.status === 'active' ? 'success' :
                              property.status === 'sold' ? 'error' : 'warning'}
                       variant="outlined"
@@ -459,37 +584,55 @@ function PropertyDetail() {
                   )}
                 </Box>
 
-                {/* Dense two-column meta grid */}
+                {/* Dense two-column meta grid with single-row label/value */}
                 <Grid container spacing={0.5} columns={12}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2">
-                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Follow-up Date:</span> {property.followUpDate ? new Date(property.followUpDate).toLocaleString() : '-'}
-                    </Typography>
+                  <Grid item xs={12} sm={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'nowrap' }}>
+                      <Typography variant="body2" sx={{ color: 'rgba(0,0,0,0.6)' }}>Follow-up Date:</Typography>
+                      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        {property.followUpDate ? new Date(property.followUpDate).toLocaleString() : '-'}
+                      </Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2">
-                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Follow-up Set:</span> {property.followUpSet ? new Date(property.followUpSet).toLocaleString() : '-'}
-                    </Typography>
+                  <Grid item xs={12} sm={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'nowrap' }}>
+                      <Typography variant="body2" sx={{ color: 'rgba(0,0,0,0.6)' }}>Follow-up Set:</Typography>
+                      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        {property.followUpSet ? new Date(property.followUpSet).toLocaleString() : '-'}
+                      </Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2">
-                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Last Follow-up:</span> {property.lastFollowUpDate ? new Date(property.lastFollowUpDate).toLocaleString() : '-'}
-                    </Typography>
+                  <Grid item xs={12} sm={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'nowrap' }}>
+                      <Typography variant="body2" sx={{ color: 'rgba(0,0,0,0.6)' }}>Last Follow-up:</Typography>
+                      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        {property.lastFollowUpDate ? new Date(property.lastFollowUpDate).toLocaleString() : '-'}
+                      </Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2">
-                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Duplicate Of:</span> {property.duplicate_of || '-'}
-                    </Typography>
+                  <Grid item xs={12} sm={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'nowrap' }}>
+                      <Typography variant="body2" sx={{ color: 'rgba(0,0,0,0.6)' }}>Duplicate Of:</Typography>
+                      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        {property.duplicate_of || '-'}
+                      </Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2">
-                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Created At:</span> {property.createdAt ? new Date(property.createdAt).toLocaleString() : '-'}
-                    </Typography>
+                  <Grid item xs={12} sm={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'nowrap' }}>
+                      <Typography variant="body2" sx={{ color: 'rgba(0,0,0,0.6)' }}>Created At:</Typography>
+                      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        {property.createdAt ? new Date(property.createdAt).toLocaleString() : '-'}
+                      </Typography>
+                    </Box>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2">
-                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Updated At:</span> {property.updatedAt ? new Date(property.updatedAt).toLocaleString() : '-'}
-                    </Typography>
+                  <Grid item xs={12} sm={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'nowrap' }}>
+                      <Typography variant="body2" sx={{ color: 'rgba(0,0,0,0.6)' }}>Updated At:</Typography>
+                      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        {property.updatedAt ? new Date(property.updatedAt).toLocaleString() : '-'}
+                      </Typography>
+                    </Box>
                   </Grid>
                 </Grid>
                 </CardContent>
@@ -499,6 +642,19 @@ function PropertyDetail() {
         </Grid>
       </Grid>
     </PropertyPageLayout>
+    {/* Delete Confirmation Dialog */}
+    <ConfirmationDialog
+      open={confirmDeleteOpen}
+      title="Delete Property"
+      message="Are you sure you want to delete this property? This action can be undone from Deleted items."
+      confirmText="Delete"
+      cancelText="Cancel"
+      severity="error"
+      onConfirm={handleConfirmDelete}
+      onCancel={handleCloseDelete}
+      loading={deleting}
+    />
+    </>
   );
 }
 

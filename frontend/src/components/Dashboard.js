@@ -8,6 +8,8 @@ import {
 import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
 import api from '../services/api';
+import ConfirmationDialog from './ui/ConfirmationDialog';
+import { useToast } from '../contexts/ToastContext';
 import { useSearch } from '../contexts/SearchContext';
 import { useCounts } from '../contexts/CountsContext';
 
@@ -24,6 +26,9 @@ function Dashboard() {
   const navigate = useNavigate();
   const { filterProperties, searchState, updateDynamicFields } = useSearch();
   const { counts } = useCounts();
+  const { showSuccess, showError } = useToast();
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const sortPropertiesByRecentChange = (props = []) => {
     return props
@@ -109,15 +114,22 @@ function Dashboard() {
     }
   };
 
-  const handleDelete = async (propertyId) => {
-    if (window.confirm('Are you sure you want to delete this property?')) {
-      try {
-        await api.deleteProperty(propertyId);
-        setMessage('Property deleted successfully!');
-        fetchStats(); // Refresh stats
-      } catch (error) {
-        setMessage('Error deleting property: ' + error.message);
-      }
+  const handleDelete = (propertyId) => {
+    setConfirmDeleteId(propertyId);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    try {
+      setDeleting(true);
+      await api.deleteProperty(confirmDeleteId);
+      showSuccess('Property deleted', 'Success');
+      fetchStats();
+    } catch (error) {
+      showError(error.message || 'Error deleting property', 'Error');
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -327,6 +339,18 @@ function Dashboard() {
           onUpdate={() => {
             fetchStats();
           }}
+        />
+
+        <ConfirmationDialog
+          open={Boolean(confirmDeleteId)}
+          title="Delete Property"
+          message="Are you sure you want to delete this property? This action can be undone from Deleted items."
+          confirmText="Delete"
+          cancelText="Cancel"
+          severity="error"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmDeleteId(null)}
+          loading={deleting}
         />
         
         {/* Show more results message */}

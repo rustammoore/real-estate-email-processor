@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const { protect, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
@@ -17,6 +18,7 @@ router.post('/', protect, async (req, res) => {
       location,
       property_type,
       sub_type,
+      state,
       square_feet,
       acre,
       year_built,
@@ -44,6 +46,7 @@ router.post('/', protect, async (req, res) => {
       location,
       property_type,
       sub_type,
+      state,
       square_feet,
       acre,
       year_built,
@@ -53,6 +56,7 @@ router.post('/', protect, async (req, res) => {
       property_url,
       for_lease_info,
       other,
+      procured,
       email_source,
       email_subject,
       // If client passes email_date string, coerce to Date
@@ -160,7 +164,11 @@ router.get('/', optionalAuth, async (req, res) => {
 // Get single property (optional auth)
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const property = await Property.findById(req.params.id).select('-__v');
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    const property = await Property.findById(id).select('-__v');
     
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
@@ -186,13 +194,17 @@ router.get('/:id', optionalAuth, async (req, res) => {
 // Update property (requires auth) with input filtering
 router.put('/:id', protect, async (req, res) => {
   try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
     // Allow updates to both core fields and interaction/follow-up fields
     const allowedFields = [
       'title', 'description', 'price', 'location', 'property_type', 'sub_type',
-      'square_feet', 'acre', 'year_built', 'bedrooms', 'bathrooms', 'status', 'cap_rate',
+      'state', 'square_feet', 'acre', 'year_built', 'bedrooms', 'bathrooms', 'status', 'cap_rate',
       'liked', 'loved', 'rating', 'archived', 'deleted',
       'followUpDate', 'followUpSet', 'lastFollowUpDate',
-      'for_lease_info', 'other', 'property_url'
+      'for_lease_info', 'other', 'procured', 'property_url'
     ];
 
     const update = {};
@@ -229,7 +241,7 @@ router.put('/:id', protect, async (req, res) => {
     }
 
     const property = await Property.findByIdAndUpdate(
-      req.params.id,
+      id,
       update,
       { new: true, runValidators: true }
     );
@@ -249,8 +261,12 @@ router.put('/:id', protect, async (req, res) => {
 // Soft delete: mark as deleted
 router.delete('/:id', protect, async (req, res) => {
   try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
     const property = await Property.findByIdAndUpdate(
-      req.params.id,
+      id,
       { deleted: true },
       { new: true }
     );
@@ -269,7 +285,11 @@ router.delete('/:id', protect, async (req, res) => {
 // Permanent delete: actually remove document (requires auth)
 router.delete('/:id/permanent', protect, async (req, res) => {
   try {
-    const property = await Property.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    const property = await Property.findByIdAndDelete(id);
 
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });

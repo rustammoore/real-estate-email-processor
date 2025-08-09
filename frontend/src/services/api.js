@@ -49,6 +49,13 @@ client.interceptors.response.use(
 // Properties API
 const normalizeListResponse = (data) => Array.isArray(data) ? data : (data?.items || []);
 
+// Ensure every property object has a stable string id
+const toClientProperty = (prop) => {
+  if (!prop || typeof prop !== 'object') return prop;
+  const idValue = prop.id || prop._id;
+  return idValue ? { id: String(idValue), ...prop } : { ...prop };
+};
+
 const buildQuery = (params = {}) => {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -69,7 +76,7 @@ export const getProperties = async (params = {}) => {
 
 export const getProperty = async (id) => {
   const response = await client.get(`/properties/${id}`);
-  return response.data;
+  return toClientProperty(response.data);
 };
 
 export const addProperty = async (data) => {
@@ -83,7 +90,8 @@ export const addProperty = async (data) => {
 export const updateProperty = async (id, data) => {
   const response = await client.put(`/properties/${id}`, data);
   try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
-  return response.data;
+  const updated = response.data?.property ? toClientProperty(response.data.property) : response.data;
+  return { ...response.data, property: updated };
 };
 
 export const deleteProperty = async (id) => {
@@ -116,26 +124,26 @@ export const toggleLike = async (id) => {
   const current = await client.get(`/properties/${id}`);
   const liked = !Boolean(current.data?.liked);
   const response = await client.put(`/properties/${id}`, { liked });
-  return { ...response.data.property, message: liked ? 'Property liked' : 'Like removed' };
+  return { ...toClientProperty(response.data.property), message: liked ? 'Property liked' : 'Like removed' };
 };
 
 export const toggleLove = async (id) => {
   const current = await client.get(`/properties/${id}`);
   const loved = !Boolean(current.data?.loved);
   const response = await client.put(`/properties/${id}`, { loved });
-  return { ...response.data.property, message: loved ? 'Property loved' : 'Love removed' };
+  return { ...toClientProperty(response.data.property), message: loved ? 'Property loved' : 'Love removed' };
 };
 
 export const toggleArchive = async (id) => {
   const current = await client.get(`/properties/${id}`);
   const archived = !Boolean(current.data?.archived);
   const response = await client.put(`/properties/${id}`, { archived });
-  return { ...response.data.property, message: archived ? 'Property archived' : 'Property unarchived' };
+  return { ...toClientProperty(response.data.property), message: archived ? 'Property archived' : 'Property unarchived' };
 };
 
 export const setRating = async (id, rating) => {
   const response = await client.put(`/properties/${id}`, { rating });
-  return { ...response.data.property, message: 'Rating updated' };
+  return { ...toClientProperty(response.data.property), message: 'Rating updated' };
 };
 
 // Archived properties API
@@ -176,7 +184,7 @@ export const setFollowUp = async (id, daysFromNow) => {
   };
   const response = await client.put(`/properties/${id}`, payload);
   try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
-  return { ...response.data.property, message: 'Follow-up set' };
+  return { ...toClientProperty(response.data.property), message: 'Follow-up set' };
 };
 
 export const setFollowUpDate = async (id, isoDateString) => {
@@ -188,21 +196,21 @@ export const setFollowUpDate = async (id, isoDateString) => {
   };
   const response = await client.put(`/properties/${id}`, payload);
   try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
-  return { ...response.data.property, message: 'Follow-up set' };
+  return { ...toClientProperty(response.data.property), message: 'Follow-up set' };
 };
 
 export const removeFollowUp = async (id) => {
   const payload = { followUpDate: null, lastFollowUpDate: null };
   const response = await client.put(`/properties/${id}`, payload);
   try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
-  return { ...response.data.property, message: 'Follow-up removed' };
+  return { ...toClientProperty(response.data.property), message: 'Follow-up removed' };
 };
 
 export const markAsFollowedUp = async (id) => {
   const payload = { lastFollowUpDate: new Date().toISOString() };
   const response = await client.put(`/properties/${id}`, payload);
   try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
-  return { ...response.data.property, message: 'Marked as followed up' };
+  return { ...toClientProperty(response.data.property), message: 'Marked as followed up' };
 };
 
 // Duplicate detection API
@@ -214,7 +222,7 @@ export const recheckDuplicates = async () => {
 // Deleted properties management (client expectations)
 export const restoreProperty = async (id) => {
   const response = await client.put(`/properties/${id}`, { deleted: false });
-  return { ...response.data.property, message: 'Property restored' };
+  return { ...toClientProperty(response.data.property), message: 'Property restored' };
 };
 
 export const permanentlyDeleteProperty = async (id) => {
