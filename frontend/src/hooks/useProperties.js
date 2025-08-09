@@ -27,9 +27,12 @@ export const useProperties = (filters = {}) => {
   const addProperty = useCallback(async (propertyData) => {
     try {
       setLoading(true);
-      const newProperty = await api.addProperty(propertyData);
-      setProperties(prev => [newProperty, ...prev]);
-      return newProperty;
+      const createResult = await api.addProperty(propertyData);
+      const created = createResult?.property || createResult;
+      if (created) {
+        setProperties(prev => [created, ...prev]);
+      }
+      return createResult;
     } catch (err) {
       const errorMessage = getErrorMessage(err);
       setError(errorMessage);

@@ -72,6 +72,14 @@ export const getProperty = async (id) => {
   return response.data;
 };
 
+export const addProperty = async (data) => {
+  const response = await client.post(`/properties`, data);
+  const payload = response.data;
+  // Notify listeners (e.g., header counters) that properties changed
+  try { window.dispatchEvent(new Event('property:updated')); } catch (_) {}
+  return payload;
+};
+
 export const updateProperty = async (id, data) => {
   const response = await client.put(`/properties/${id}`, data);
   return response.data;
@@ -268,6 +276,7 @@ export const updateEmailConfigApi = (emailConfig) => client.put('/auth/email-con
 const apiService = {
   getProperties,
   getProperty,
+  addProperty,
   updateProperty,
   deleteProperty,
   processEmails,

@@ -3,6 +3,87 @@ const Property = require('../models/Property');
 const { protect, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
 
+// Small helper to escape regex special chars in user input
+const escapeRegExp = (str = '') => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Create property (requires auth) with basic duplicate detection
+router.post('/', protect, async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      price,
+      location,
+      property_type,
+      square_feet,
+      bedrooms,
+      bathrooms,
+      images,
+      property_url,
+      email_source,
+      email_subject,
+      email_date
+    } = req.body || {};
+
+    if (!title || !location) {
+      return res.status(400).json({ error: 'Both title and location are required' });
+    }
+
+    // Normalize/prepare create payload
+    const createPayload = {
+      title,
+      description,
+      price,
+      location,
+      property_type,
+      square_feet,
+      bedrooms,
+      bathrooms,
+      images: Array.isArray(images) ? images : (images ? [images] : []),
+      property_url,
+      email_source,
+      email_subject,
+      // If client passes email_date string, coerce to Date
+      email_date: email_date ? new Date(email_date) : undefined,
+      user: req.user ? req.user._id : undefined
+    };
+
+    // Basic duplicate detection by location (case-insensitive exact match), excluding deleted
+    const normalizedLocation = String(location).trim();
+    let originalProperty = null;
+    if (normalizedLocation) {
+      originalProperty = await Property.findOne({
+        location: { $regex: new RegExp(`^${escapeRegExp(normalizedLocation)}$`, 'i') },
+        deleted: false,
+      }).select('-__v');
+    }
+
+    let isDuplicate = false;
+    if (originalProperty) {
+      isDuplicate = true;
+      createPayload.status = 'pending';
+      createPayload.duplicate_of = originalProperty._id;
+    } else {
+      createPayload.status = 'active';
+    }
+
+    const property = await Property.create(createPayload);
+
+    return res.status(201).json({
+      success: true,
+      message: isDuplicate
+        ? 'Property created and marked as duplicate for review'
+        : 'Property created successfully',
+      isDuplicate,
+      originalProperty: originalProperty || null,
+      property,
+    });
+  } catch (error) {
+    console.error('Error creating property:', error);
+    return res.status(500).json({ error: 'Failed to create property' });
+  }
+});
+
 // Get all properties (optional auth) with pagination
 router.get('/', optionalAuth, async (req, res) => {
   try {

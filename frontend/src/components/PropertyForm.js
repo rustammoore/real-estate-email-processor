@@ -1,37 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Container,
-  Card,
-  CardContent,
-  Typography,
-  TextField,
-  Button,
-  Grid,
-  Box,
-  Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  IconButton
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Save as SaveIcon,
-  ArrowBack as ArrowBackIcon
-} from '@mui/icons-material';
+import { Card, CardContent, Typography, TextField, Button, Grid, Box, Alert, FormControl, InputLabel, Select, MenuItem, IconButton } from '@mui/material';
+import { Add as AddIcon, Delete as DeleteIcon, Save as SaveIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import PropertyPageLayout from './layout/PropertyPageLayout';
 import api from '../services/api';
 
 import { usePendingReview } from '../hooks/usePendingReview';
-import { useDeletedProperties } from '../hooks/useDeletedProperties';
 
 function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) {
   const navigate = useNavigate();
   const params = useParams();
   const { fetchPendingReview: refreshPendingCount } = usePendingReview();
-  const { fetchDeletedProperties: refreshDeletedCount } = useDeletedProperties();
   
   // Use propertyId from props or from URL params
   const actualPropertyId = propertyId || params.id;
@@ -191,8 +170,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
       if (mode === 'create') {
         // Create new property
         response = await api.addProperty(propertyData);
-        
-        if (response.isDuplicate) {
+        if (response?.isDuplicate) {
           setMessage(`Property added but detected as duplicate. Check the Pending Review page. Original property: ${response.originalProperty?.title || response.originalProperty?.id}`);
           refreshPendingCount(); // Refresh the count in header
           // Reset form even for duplicates
@@ -258,29 +236,14 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
 
   if (initialLoading) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      <PropertyPageLayout title={mode === 'create' ? 'Add New Property' : 'Edit Property'} onBack={() => navigate(getBackUrl())}>
         <Typography>Loading property...</Typography>
-      </Container>
+      </PropertyPageLayout>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 2, mb: 2 }}>
-      <Box sx={{ mb: 1 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(getBackUrl())}
-          size="small"
-          sx={{ mb: 0.5 }}
-        >
-          Back
-        </Button>
-        
-        <Typography variant="h6" gutterBottom>
-          {mode === 'create' ? 'Add New Property' : 'Edit Property'}
-        </Typography>
-      </Box>
-
+    <PropertyPageLayout title={mode === 'create' ? 'Add New Property' : 'Edit Property'} onBack={() => navigate(getBackUrl())}>
       {message && (
         <Alert severity={message.includes('Error') ? 'error' : 'success'} sx={{ mb: 1 }}>
           {message}
@@ -528,7 +491,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
           </form>
         </CardContent>
       </Card>
-    </Container>
+    </PropertyPageLayout>
   );
 }
 
