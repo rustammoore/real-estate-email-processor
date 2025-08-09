@@ -15,6 +15,7 @@ import AuthWrapper from './components/auth/AuthWrapper';
 import UserProfile from './components/UserProfile';
 import PropertyForm from './components/PropertyForm';
 import { useAuth } from './contexts/AuthContext';
+import { CountsProvider } from './contexts/CountsContext';
 
 const theme = createTheme({
   palette: {
@@ -145,7 +146,9 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <AppShell />
+        <CountsProvider>
+          <AppShell />
+        </CountsProvider>
       </Router>
     </ThemeProvider>
   );

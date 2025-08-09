@@ -20,15 +20,15 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import LoginIcon from '@mui/icons-material/Login';
 import AddIcon from '@mui/icons-material/Add';
 import { useAuth } from '../contexts/AuthContext';
-import { useArchivedCount, useDeletedCount, usePendingReviewCount, useFollowUpCount } from '../hooks';
+import { useCounts } from '../contexts/CountsContext';
 
 function Header() {
   const { isAuthenticated, logout } = useAuth();
-  const { count: pendingCount } = usePendingReviewCount();
-  const { count: archivedCount } = useArchivedCount();
-  const { count: deletedCount } = useDeletedCount();
-  const { followUpCounts } = useFollowUpCount();
-  const followUpsDue = followUpCounts?.due || 0;
+  const { counts } = useCounts();
+  const pendingCount = counts?.pendingReview || 0;
+  const archivedCount = counts?.archived || 0;
+  const deletedCount = counts?.deleted || 0;
+  const followUpsDue = counts?.followUps?.due || 0;
   const badgeBaseSx = {
     height: 20,
     width: 20,
