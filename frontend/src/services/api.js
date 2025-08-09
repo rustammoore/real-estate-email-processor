@@ -1,45 +1,308 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3101/api';
+const DEFAULT_LIST_LIMIT = Number(process.env.REACT_APP_LIST_LIMIT || 1000);
 
-const api = axios.create({
+const client = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+// Auth token management
+let authToken = localStorage.getItem('token') || null;
+
+export const setAuthToken = (token) => {
+  authToken = token;
+  if (token) {
+    localStorage.setItem('token', token);
+  } else {
+    localStorage.removeItem('token');
+  }
+};
+
+export const getAuthToken = () => authToken;
+export const isAuthenticated = () => Boolean(authToken);
+
+// Attach token to requests
+client.interceptors.request.use((config) => {
+  if (authToken) {
+    config.headers.Authorization = `Bearer ${authToken}`;
+  }
+  return config;
+});
+
+// Handle 401 responses globally
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Broadcast logout event
+      window.dispatchEvent(new Event('auth:logout'));
+      setAuthToken(null);
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Properties API
-export const getProperties = async () => {
-  const response = await api.get('/properties');
-  return response.data;
+const normalizeListResponse = (data) => Array.isArray(data) ? data : (data?.items || []);
+
+const buildQuery = (params = {}) => {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
+  });
+  const queryString = search.toString();
+  return queryString ? `?${queryString}` : '';
+};
+
+export const getProperties = async (params = {}) => {
+  // Ensure reasonable defaults for dashboard and client-side filtering
+  const query = buildQuery({ page: params.page || 1, limit: params.limit || DEFAULT_LIST_LIMIT, ...params });
+  const response = await client.get(`/properties${query}`);
+  return normalizeListResponse(response.data);
 };
 
 export const getProperty = async (id) => {
-  const response = await api.get(`/properties/${id}`);
+  const response = await client.get(`/properties/${id}`);
   return response.data;
 };
 
 export const updateProperty = async (id, data) => {
-  const response = await api.put(`/properties/${id}`, data);
+  const response = await client.put(`/properties/${id}`, data);
   return response.data;
 };
 
 export const deleteProperty = async (id) => {
-  const response = await api.delete(`/properties/${id}`);
+  const response = await client.delete(`/properties/${id}`);
   return response.data;
 };
 
-// Email processing API
+// Email processing API (disabled/stub)
 export const processEmails = async () => {
-  const response = await api.post('/process-emails');
+  // Backend endpoint was removed during MongoDB migration. Return a safe stub.
+  return { success: true, message: 'Email processing is currently disabled.' };
+};
+
+// Property interaction API
+export const toggleLike = async (id) => {
+  // Fetch current to compute toggle
+  const current = await client.get(`/properties/${id}`);
+  const liked = !Boolean(current.data?.liked);
+  const response = await client.put(`/properties/${id}`, { liked });
+  return { ...response.data.property, message: liked ? 'Property liked' : 'Like removed' };
+};
+
+export const toggleLove = async (id) => {
+  const current = await client.get(`/properties/${id}`);
+  const loved = !Boolean(current.data?.loved);
+  const response = await client.put(`/properties/${id}`, { loved });
+  return { ...response.data.property, message: loved ? 'Property loved' : 'Love removed' };
+};
+
+export const toggleArchive = async (id) => {
+  const current = await client.get(`/properties/${id}`);
+  const archived = !Boolean(current.data?.archived);
+  const response = await client.put(`/properties/${id}`, { archived });
+  return { ...response.data.property, message: archived ? 'Property archived' : 'Property unarchived' };
+};
+
+export const setRating = async (id, rating) => {
+  const response = await client.put(`/properties/${id}`, { rating });
+  return { ...response.data.property, message: 'Rating updated' };
+};
+
+// Archived properties API
+export const getArchivedProperties = async () => {
+  const response = await client.get(`/properties${buildQuery({ archived: true, page: 1, limit: DEFAULT_LIST_LIMIT })}`);
+  return normalizeListResponse(response.data);
+};
+
+export const getArchivedPropertiesCount = async () => {
+  const archived = await getArchivedProperties();
+  const count = Array.isArray(archived) ? archived.length : (archived?.count || 0);
+  return { count };
+};
+
+// Pending review properties API
+export const getPendingReviewProperties = async () => {
+  // Backend uses status 'pending'
+  const response = await client.get(`/properties${buildQuery({ status: 'pending', page: 1, limit: DEFAULT_LIST_LIMIT })}`);
+  return normalizeListResponse(response.data);
+};
+
+// Deleted properties API
+export const getDeletedProperties = async () => {
+  // Ask backend specifically for deleted
+  const response = await client.get(`/properties${buildQuery({ deleted: true, page: 1, limit: DEFAULT_LIST_LIMIT })}`);
+  return normalizeListResponse(response.data);
+};
+
+// Follow-up API
+export const setFollowUp = async (id, daysFromNow) => {
+  const now = new Date();
+  const target = new Date(now);
+  target.setDate(target.getDate() + Number(daysFromNow || 0));
+  const payload = {
+    followUpDate: target.toISOString(),
+    followUpSet: now.toISOString(),
+    lastFollowUpDate: null
+  };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Follow-up set' };
+};
+
+export const setFollowUpDate = async (id, isoDateString) => {
+  const now = new Date();
+  const payload = {
+    followUpDate: new Date(isoDateString).toISOString(),
+    followUpSet: now.toISOString(),
+    lastFollowUpDate: null
+  };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Follow-up set' };
+};
+
+export const removeFollowUp = async (id) => {
+  const payload = { followUpDate: null, lastFollowUpDate: null };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Follow-up removed' };
+};
+
+export const markAsFollowedUp = async (id) => {
+  const payload = { lastFollowUpDate: new Date().toISOString() };
+  const response = await client.put(`/properties/${id}`, payload);
+  return { ...response.data.property, message: 'Marked as followed up' };
+};
+
+// Duplicate detection API
+export const recheckDuplicates = async () => {
+  // Not implemented server-side; return a friendly stub
+  return { success: false, message: 'Duplicate recheck is currently unavailable.' };
+};
+
+// Deleted properties management (client expectations)
+export const restoreProperty = async (id) => {
+  const response = await client.put(`/properties/${id}`, { deleted: false });
+  return { ...response.data.property, message: 'Property restored' };
+};
+
+export const permanentlyDeleteProperty = async (id) => {
+  const response = await client.delete(`/properties/${id}/permanent`);
   return response.data;
 };
 
-export default {
+// Pending review actions (stubs)
+export const approveDuplicate = async (duplicateId, originalId) => {
+  // Backend endpoint not implemented yet.
+  // Minimal fallback: remove the duplicate so the list shrinks.
+  // When server support exists, this should merge data and delete the duplicate.
+  await permanentlyDeleteProperty(duplicateId);
+  return { success: true, message: 'Duplicate approved by removing the duplicate.' };
+};
+
+export const rejectDuplicate = async (id) => {
+  // As a minimal action, treat reject as deleting the duplicate
+  return permanentlyDeleteProperty(id);
+};
+
+export const getOriginalProperty = async (duplicateId) => {
+  // Step 1: fetch the duplicate to discover its original id
+  const duplicateResponse = await client.get(`/properties/${duplicateId}`);
+  const duplicate = duplicateResponse.data;
+
+  const originalId = duplicate?.duplicate_of?._id || duplicate?.duplicate_of;
+  if (!originalId) {
+    throw new Error('Original property is not linked to this duplicate.');
+  }
+
+  // Step 2: fetch the original property
+  const originalResponse = await client.get(`/properties/${originalId}`);
+  return originalResponse.data;
+};
+
+// Follow-ups API (computed client-side from all properties)
+export const fetchFollowUps = async () => {
+  const properties = await getProperties();
+
+  const now = new Date();
+  // Normalize to end of today so anything earlier is considered due
+  const endOfToday = new Date(now);
+  endOfToday.setHours(23, 59, 59, 999);
+
+  // Include archived items in follow-ups, exclude only deleted
+  const isEligible = (p) => !p.deleted;
+  const hasFollowUp = (p) => Boolean(p.followUpDate);
+
+  const followUpsDue = properties.filter(
+    (p) => isEligible(p) && hasFollowUp(p) && new Date(p.followUpDate) <= endOfToday
+  );
+  const followUpsNotDue = properties.filter(
+    (p) => isEligible(p) && hasFollowUp(p) && new Date(p.followUpDate) > endOfToday
+  );
+
+  return {
+    followUpsDue,
+    followUpsNotDue,
+    counts: {
+      due: followUpsDue.length,
+      notDue: followUpsNotDue.length,
+      total: followUpsDue.length + followUpsNotDue.length,
+    },
+  };
+};
+
+// Auth endpoints
+export const login = (credentials) => client.post('/auth/login', credentials);
+export const register = (userData) => client.post('/auth/register', userData);
+export const logout = () => client.post('/auth/logout');
+export const getCurrentUser = () => client.get('/auth/me');
+export const updateProfileApi = (profileData) => client.put('/auth/profile', profileData);
+export const changePasswordApi = (passwordData) => client.put('/auth/change-password', passwordData);
+export const updateEmailConfigApi = (emailConfig) => client.put('/auth/email-config', emailConfig);
+
+const apiService = {
   getProperties,
   getProperty,
   updateProperty,
   deleteProperty,
   processEmails,
-}; 
+  toggleLike,
+  toggleLove,
+  toggleArchive,
+  setRating,
+  getArchivedProperties,
+  getArchivedPropertiesCount,
+  getPendingReviewProperties,
+  getDeletedProperties,
+  recheckDuplicates,
+  setFollowUp,
+  setFollowUpDate,
+  removeFollowUp,
+  markAsFollowedUp,
+  // review & duplicates
+  approveDuplicate,
+  rejectDuplicate,
+  getOriginalProperty,
+  // deletion/restore helpers
+  restoreProperty,
+  permanentlyDeleteProperty,
+  fetchFollowUps,
+  // auth helpers for context
+  setAuthToken,
+  getAuthToken,
+  isAuthenticated,
+  login,
+  register,
+  logout,
+  getCurrentUser,
+  updateProfile: updateProfileApi,
+  changePassword: changePasswordApi,
+  updateEmailConfig: updateEmailConfigApi,
+};
+
+export default apiService; 

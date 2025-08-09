@@ -1,25 +1,57 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
-const { initializeDatabase } = require('./database/database');
-const emailProcessor = require('./services/emailProcessor');
+const { connectToDatabase } = require('./database/mongodb');
 const propertyRoutes = require('./routes/properties');
-const cron = require('node-cron');
+const authRoutes = require('./routes/auth');
+const errorHandler = require('./middleware/errorHandler');
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3101;
 
-// Middleware
-app.use(cors());
+// Security & core middleware
+app.use(helmet());
+
+// CORS: allow localhost dev and same-origin in prod
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3100').split(',');
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
+
+// Basic rate limiting (disabled in development; always skip health checks)
+const rateLimitMax = process.env.RATE_LIMIT_MAX ? parseInt(process.env.RATE_LIMIT_MAX, 10) : 300;
+const enableRateLimit = (process.env.NODE_ENV === 'production') && rateLimitMax > 0;
+
+if (enableRateLimit) {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: rateLimitMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.method === 'OPTIONS' || req.path === '/api/health',
+  });
+  app.use(limiter);
+}
+
+// Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Initialize database
-initializeDatabase();
+connectToDatabase();
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 
 // Health check endpoint
@@ -27,38 +59,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Real Estate Email Processor is running' });
 });
 
-// Schedule email processing (every 30 minutes)
-cron.schedule('*/30 * * * *', async () => {
-  console.log('Running scheduled email processing...');
-  try {
-    await emailProcessor.processEmails();
-  } catch (error) {
-    console.error('Error in scheduled email processing:', error);
-  }
-});
-
-// Manual email processing endpoint
-app.post('/api/process-emails', async (req, res) => {
-  try {
-    const results = await emailProcessor.processEmails();
-    res.json({ success: true, results });
-  } catch (error) {
-    console.error('Error processing emails:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Add sample data endpoint
-app.post('/api/add-sample-data', async (req, res) => {
-  try {
-    const { populateSampleData } = require('./sampleData');
-    await populateSampleData();
-    res.json({ success: true, message: 'Sample data added successfully' });
-  } catch (error) {
-    console.error('Error adding sample data:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// Centralized error handler (must be after routes)
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

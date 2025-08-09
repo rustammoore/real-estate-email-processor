@@ -1,0 +1,87 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: real-estate-mongodb
+    ports:
+      - "3102:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+      - MONGO_INITDB_DATABASE=real-estate-email-processor
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - real-estate-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        NODE_ENV: ${NODE_ENV:-production}
+    container_name: real-estate-backend
+    ports:
+      - "3101:3101"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3101
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/real-estate-email-processor?authSource=admin
+    volumes:
+      - ./backend/.env:/app/.env:ro
+      # Development volume mounting (uncomment for development)
+      # - ./backend:/app
+      # - /app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - real-estate-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3101/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # For production image builds served by nginx, prefer same-origin API via nginx proxy
+        # The nginx in the frontend container proxies /api to the backend service.
+        REACT_APP_API_URL: /api
+    container_name: real-estate-frontend
+    ports:
+      - "3100:3100"
+    environment:
+      # This environment variable is not used by the built React app,
+      # but kept for consistency and documentation
+      - REACT_APP_API_URL=/api
+    volumes: []
+      # Development volume mounting (uncomment for development)
+      # - ./frontend:/app
+      # - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - real-estate-network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  real-estate-network:
+    driver: bridge 

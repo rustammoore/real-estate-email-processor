@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Card,
@@ -26,6 +26,7 @@ import api from '../services/api';
 function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -35,6 +36,14 @@ function PropertyDetail() {
   useEffect(() => {
     fetchProperty();
   }, [id]);
+
+  // Enable edit mode when navigated with ?edit=1
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('edit') === '1') {
+      setEditing(true);
+    }
+  }, [location.search]);
 
   const fetchProperty = async () => {
     try {

@@ -1,42 +1,69 @@
 const express = require('express');
-const { query, run } = require('../database/database');
+const Property = require('../models/Property');
+const { protect, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
 
-// Get all properties
-router.get('/', async (req, res) => {
+// Get all properties (optional auth) with pagination
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const properties = await query(`
-      SELECT * FROM properties 
-      ORDER BY created_at DESC
-    `);
+    const { status, archived, deleted, page = 1, limit = 25 } = req.query;
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 25, 1), 100);
+    let filter = {};
     
-    // Parse images JSON for each property
-    const formattedProperties = properties.map(property => ({
-      ...property,
-      images: JSON.parse(property.images || '[]')
-    }));
+    if (status) {
+      filter.status = status;
+    }
     
-    res.json(formattedProperties);
+    if (archived !== undefined) {
+      filter.archived = archived === 'true';
+    }
+    
+    // Exclude deleted by default unless explicitly requested
+    if (deleted !== undefined) {
+      filter.deleted = deleted === 'true';
+    } else {
+      filter.deleted = false;
+    }
+    
+    const query = Property.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((parsedPage - 1) * parsedLimit)
+      .limit(parsedLimit)
+      .select('-__v')
+      .lean();
+
+    const [rawItems, total] = await Promise.all([
+      query,
+      Property.countDocuments(filter)
+    ]);
+
+    const items = rawItems.map((doc) => {
+      const { _id, ...rest } = doc;
+      return { id: String(_id || rest.id), ...rest };
+    });
+
+    res.json({
+      items,
+      page: parsedPage,
+      limit: parsedLimit,
+      total,
+      totalPages: Math.ceil(total / parsedLimit)
+    });
   } catch (error) {
     console.error('Error fetching properties:', error);
     res.status(500).json({ error: 'Failed to fetch properties' });
   }
 });
 
-// Get single property
-router.get('/:id', async (req, res) => {
+// Get single property (optional auth)
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const properties = await query(
-      'SELECT * FROM properties WHERE id = ?',
-      [req.params.id]
-    );
+    const property = await Property.findById(req.params.id).select('-__v');
     
-    if (properties.length === 0) {
+    if (!property) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    
-    const property = properties[0];
-    property.images = JSON.parse(property.images || '[]');
     
     res.json(property);
   } catch (error) {
@@ -45,42 +72,95 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update property
-router.put('/:id', async (req, res) => {
+// Update property (requires auth) with input filtering
+router.put('/:id', protect, async (req, res) => {
   try {
-    const {
-      title, description, price, location, property_type,
-      square_feet, bedrooms, bathrooms, status
-    } = req.body;
+    // Allow updates to both core fields and interaction/follow-up fields
+    const allowedFields = [
+      'title', 'description', 'price', 'location', 'property_type',
+      'square_feet', 'bedrooms', 'bathrooms', 'status',
+      'liked', 'loved', 'rating', 'archived', 'deleted',
+      'followUpDate', 'followUpSet', 'lastFollowUpDate'
+    ];
 
-    const sql = `
-      UPDATE properties SET 
-        title = ?, description = ?, price = ?, location = ?,
-        property_type = ?, square_feet = ?, bedrooms = ?, 
-        bathrooms = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `;
+    const update = {};
+    for (const field of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        update[field] = req.body[field];
+      }
+    }
 
-    await run(sql, [
-      title, description, price, location, property_type,
-      square_feet, bedrooms, bathrooms, status, req.params.id
-    ]);
+    // Basic server-side validation for rating and date formats
+    if (Object.prototype.hasOwnProperty.call(update, 'rating')) {
+      const rating = Number(update.rating);
+      if (!Number.isFinite(rating) || rating < 0 || rating > 10) {
+        return res.status(400).json({ error: 'Rating must be a number between 0 and 10' });
+      }
+      update.rating = rating;
+    }
 
-    res.json({ success: true, message: 'Property updated successfully' });
+    const dateFields = ['followUpDate', 'followUpSet', 'lastFollowUpDate'];
+    for (const df of dateFields) {
+      if (Object.prototype.hasOwnProperty.call(update, df) && update[df] !== null) {
+        const dateValue = new Date(update[df]);
+        if (Number.isNaN(dateValue.getTime())) {
+          return res.status(400).json({ error: `${df} must be a valid date` });
+        }
+        update[df] = dateValue;
+      }
+    }
+
+    const property = await Property.findByIdAndUpdate(
+      req.params.id,
+      update,
+      { new: true, runValidators: true }
+    );
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    res.json({ success: true, message: 'Property updated successfully', property });
   } catch (error) {
     console.error('Error updating property:', error);
     res.status(500).json({ error: 'Failed to update property' });
   }
 });
 
-// Delete property
-router.delete('/:id', async (req, res) => {
+// Delete property (requires auth)
+// Soft delete: mark as deleted
+router.delete('/:id', protect, async (req, res) => {
   try {
-    await run('DELETE FROM properties WHERE id = ?', [req.params.id]);
-    res.json({ success: true, message: 'Property deleted successfully' });
+    const property = await Property.findByIdAndUpdate(
+      req.params.id,
+      { deleted: true },
+      { new: true }
+    );
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    res.json({ success: true, message: 'Property moved to deleted', property });
   } catch (error) {
-    console.error('Error deleting property:', error);
+    console.error('Error soft-deleting property:', error);
     res.status(500).json({ error: 'Failed to delete property' });
+  }
+});
+
+// Permanent delete: actually remove document (requires auth)
+router.delete('/:id/permanent', protect, async (req, res) => {
+  try {
+    const property = await Property.findByIdAndDelete(req.params.id);
+
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    res.json({ success: true, message: 'Property permanently deleted' });
+  } catch (error) {
+    console.error('Error permanently deleting property:', error);
+    res.status(500).json({ error: 'Failed to permanently delete property' });
   }
 });
 

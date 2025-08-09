@@ -2,14 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   Container,
   Grid,
-  Card,
-  CardContent,
-  CardMedia,
   Typography,
   Button,
   TextField,
   Box,
-  Chip,
   FormControl,
   InputLabel,
   Select,
@@ -18,18 +14,28 @@ import {
 import { useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
 import api from '../services/api';
+import { useSearch } from '../contexts/SearchContext';
+import PropertyGrid from './PropertyGrid';
 
 function PropertyList() {
+  const { updateDynamicFields } = useSearch();
   const [properties, setProperties] = useState([]);
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchProperties();
   }, []);
+
+  useEffect(() => {
+    if (properties && properties.length > 0) {
+      updateDynamicFields(properties);
+    }
+  }, [properties, updateDynamicFields]);
 
   useEffect(() => {
     filterProperties();
@@ -64,6 +70,28 @@ function PropertyList() {
     }
 
     setFilteredProperties(filtered);
+  };
+
+  const handleDelete = async (propertyId) => {
+    if (window.confirm('Are you sure you want to delete this property?')) {
+      try {
+        await api.deleteProperty(propertyId);
+        setMessage('Property deleted successfully!');
+        setProperties(prev => prev.filter(p => p.id !== propertyId));
+        fetchProperties();
+      } catch (error) {
+        setMessage('Error deleting property: ' + error.message);
+      }
+    }
+  };
+
+  const handlePropertyUpdate = (updatedProperty) => {
+    if (!updatedProperty) {
+      // Some child actions call onUpdate() with no args; fallback to refresh
+      fetchProperties();
+      return;
+    }
+    setProperties(prev => prev.map(p => p.id === updatedProperty.id ? updatedProperty : p));
   };
 
   const getStatusColor = (status) => {
@@ -126,56 +154,16 @@ function PropertyList() {
         </Grid>
       </Box>
 
-      {/* Properties Grid */}
-      <Grid container spacing={3}>
-        {filteredProperties.map((property) => (
-          <Grid item xs={12} sm={6} md={4} key={property.id}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {property.images && property.images.length > 0 && (
-                <CardMedia
-                  component="img"
-                  height="200"
-                  image={property.images[0]}
-                  alt={property.title}
-                  sx={{ objectFit: 'cover' }}
-                />
-              )}
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Typography variant="h6" gutterBottom noWrap>
-                  {property.title}
-                </Typography>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                  {property.description.substring(0, 100)}...
-                </Typography>
-                
-                <Box sx={{ mb: 2 }}>
-                  <Chip
-                    label={property.status}
-                    color={getStatusColor(property.status)}
-                    size="small"
-                  />
-                </Box>
-
-                <Typography variant="caption" color="textSecondary" display="block">
-                  From: {property.email_source}
-                </Typography>
-                <Typography variant="caption" color="textSecondary" display="block">
-                  {new Date(property.created_at).toLocaleDateString()}
-                </Typography>
-
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  sx={{ mt: 2 }}
-                  onClick={() => navigate(`/properties/${property.id}`)}
-                >
-                  View Details
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      {/* Property Grid using unified PropertyCard actions */}
+      <PropertyGrid 
+        properties={filteredProperties}
+        loading={loading}
+        onDelete={handleDelete}
+        onPropertyUpdate={handlePropertyUpdate}
+        onUpdate={fetchProperties}
+        showFollowUpBadge={true}
+        variant="outlined"
+      />
 
       {filteredProperties.length === 0 && (
         <Box textAlign="center" sx={{ mt: 4 }}>
