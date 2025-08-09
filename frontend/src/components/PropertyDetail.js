@@ -236,7 +236,7 @@ function PropertyDetail() {
                   value={editing ? formData.images : normalizeImages(property.images)}
                   onChange={(imgs) => editing && setFormData((prev) => ({ ...prev, images: imgs }))}
                   columns={3}
-                  tileHeight={96}
+                  tileHeight={240}
                   dropzoneSize={160}
                 />
               </CardContent>
@@ -307,8 +307,21 @@ function PropertyDetail() {
               </Typography>
 
               {(() => {
+                const metaFieldNames = [
+                  'liked',
+                  'loved',
+                  'archived',
+                  'rating',
+                  'followUpDate',
+                  'followUpSet',
+                  'lastFollowUpDate',
+                  'duplicate_of',
+                  'createdAt',
+                  'updatedAt',
+                ];
+
                 const additionalFields = getFieldsForContext(editing ? PROPERTY_CONTEXTS.EDIT : PROPERTY_CONTEXTS.VIEW)
-                  .filter((f) => f.section === PROPERTY_SECTIONS.ADDITIONAL);
+                  .filter((f) => f.section === PROPERTY_SECTIONS.ADDITIONAL && !metaFieldNames.includes(f.name));
 
                 return (
                   <>
@@ -380,23 +393,92 @@ function PropertyDetail() {
                   </>
                 );
               })()}
-
-              {/* Status chip can be inferred from the status field above; keep the chip for quick glance */}
-              {'status' in property && (
-                <Box sx={{ mt: 1 }}>
-                  <Typography variant="subtitle2" color="textSecondary">
-                    Status:
-                  </Typography>
-                  <Chip
-                    label={property.status}
-                    color={property.status === 'active' ? 'success' : 
-                           property.status === 'sold' ? 'error' : 'warning'}
-                    sx={{ mt: 1 }}
-                  />
-                </Box>
-              )}
             </CardContent>
           </Card>
+
+          {/* Interactions & Activity (view-only) */}
+          {!editing && (
+            <Box sx={{ mt: 2 }}>
+              <Card>
+                <CardContent sx={{ py: 1, px: 1.5 }}>
+                <Typography variant="h6" gutterBottom>
+                  Interactions & Activity
+                </Typography>
+
+                {/* Compact chips row */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                  <Chip
+                    size="small"
+                    label="Liked"
+                    color={property.liked ? 'success' : 'default'}
+                    variant={property.liked ? 'filled' : 'outlined'}
+                  />
+                  <Chip
+                    size="small"
+                    label="Loved"
+                    color={property.loved ? 'success' : 'default'}
+                    variant={property.loved ? 'filled' : 'outlined'}
+                  />
+                  <Chip
+                    size="small"
+                    label="Archived"
+                    color={property.archived ? 'warning' : 'default'}
+                    variant={property.archived ? 'filled' : 'outlined'}
+                  />
+                  <Chip
+                    size="small"
+                    label={property.rating && property.rating > 0 ? `Rating ${property.rating}` : 'No rating'}
+                    color={property.rating && property.rating > 0 ? 'primary' : 'default'}
+                    variant={property.rating && property.rating > 0 ? 'filled' : 'outlined'}
+                  />
+                  {'status' in property && (
+                    <Chip
+                      size="small"
+                      label={`Status: ${property.status}`}
+                      color={property.status === 'active' ? 'success' :
+                             property.status === 'sold' ? 'error' : 'warning'}
+                      variant="outlined"
+                    />
+                  )}
+                </Box>
+
+                {/* Dense two-column meta grid */}
+                <Grid container spacing={0.5} columns={12}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2">
+                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Follow-up Date:</span> {property.followUpDate ? new Date(property.followUpDate).toLocaleString() : '-'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2">
+                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Follow-up Set:</span> {property.followUpSet ? new Date(property.followUpSet).toLocaleString() : '-'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2">
+                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Last Follow-up:</span> {property.lastFollowUpDate ? new Date(property.lastFollowUpDate).toLocaleString() : '-'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2">
+                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Duplicate Of:</span> {property.duplicate_of || '-'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2">
+                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Created At:</span> {property.createdAt ? new Date(property.createdAt).toLocaleString() : '-'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2">
+                      <span style={{ color: 'rgba(0,0,0,0.6)' }}>Updated At:</span> {property.updatedAt ? new Date(property.updatedAt).toLocaleString() : '-'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+                </CardContent>
+              </Card>
+            </Box>
+          )}
         </Grid>
       </Grid>
     </PropertyPageLayout>

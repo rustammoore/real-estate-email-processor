@@ -21,6 +21,10 @@ const propertySchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  cap_rate: {
+    type: String,
+    trim: true
+  },
   location: {
     type: String,
     trim: true
@@ -29,7 +33,19 @@ const propertySchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  sub_type: {
+    type: String,
+    trim: true
+  },
   square_feet: {
+    type: String,
+    trim: true
+  },
+  acre: {
+    type: String,
+    trim: true
+  },
+  year_built: {
     type: String,
     trim: true
   },
@@ -46,6 +62,14 @@ const propertySchema = new mongoose.Schema({
     trim: true
   }],
   property_url: {
+    type: String,
+    trim: true
+  },
+  for_lease_info: {
+    type: String,
+    trim: true
+  },
+  other: {
     type: String,
     trim: true
   },

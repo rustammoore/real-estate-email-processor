@@ -13,13 +13,19 @@ router.post('/', protect, async (req, res) => {
       title,
       description,
       price,
+      cap_rate,
       location,
       property_type,
+      sub_type,
       square_feet,
+      acre,
+      year_built,
       bedrooms,
       bathrooms,
       images,
       property_url,
+      for_lease_info,
+      other,
       email_source,
       email_subject,
       email_date
@@ -34,13 +40,19 @@ router.post('/', protect, async (req, res) => {
       title,
       description,
       price,
+      cap_rate,
       location,
       property_type,
+      sub_type,
       square_feet,
+      acre,
+      year_built,
       bedrooms,
       bathrooms,
       images: Array.isArray(images) ? images : (images ? [images] : []),
       property_url,
+      for_lease_info,
+      other,
       email_source,
       email_subject,
       // If client passes email_date string, coerce to Date
@@ -121,7 +133,15 @@ router.get('/', optionalAuth, async (req, res) => {
 
     const items = rawItems.map((doc) => {
       const { _id, ...rest } = doc;
-      return { id: String(_id || rest.id), ...rest };
+      const id = String(_id || rest.id);
+      // Compute price per ft if possible
+      let price_per_ft = null;
+      const priceNum = parseFloat(rest.price);
+      const sqftNum = parseFloat(rest.square_feet);
+      if (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0) {
+        price_per_ft = priceNum / sqftNum;
+      }
+      return { id, ...rest, price_per_ft };
     });
 
     res.json({
@@ -146,7 +166,17 @@ router.get('/:id', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Property not found' });
     }
     
-    res.json(property);
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    const data = property.toObject();
+    const priceNum = parseFloat(data.price);
+    const sqftNum = parseFloat(data.square_feet);
+    let price_per_ft = null;
+    if (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0) {
+      price_per_ft = priceNum / sqftNum;
+    }
+    res.json({ ...data, price_per_ft });
   } catch (error) {
     console.error('Error fetching property:', error);
     res.status(500).json({ error: 'Failed to fetch property' });
@@ -158,10 +188,11 @@ router.put('/:id', protect, async (req, res) => {
   try {
     // Allow updates to both core fields and interaction/follow-up fields
     const allowedFields = [
-      'title', 'description', 'price', 'location', 'property_type',
-      'square_feet', 'bedrooms', 'bathrooms', 'status',
+      'title', 'description', 'price', 'location', 'property_type', 'sub_type',
+      'square_feet', 'acre', 'year_built', 'bedrooms', 'bathrooms', 'status', 'cap_rate',
       'liked', 'loved', 'rating', 'archived', 'deleted',
-      'followUpDate', 'followUpSet', 'lastFollowUpDate'
+      'followUpDate', 'followUpSet', 'lastFollowUpDate',
+      'for_lease_info', 'other', 'property_url'
     ];
 
     const update = {};

@@ -93,46 +93,83 @@ function PropertyCard({
 
       {/* Card Content */}
       <div className={`flex-grow p-${compact ? '3' : '4'}`}>
-        <h3 className={`${compact ? 'text-lg' : 'text-xl'} font-medium mb-2 truncate`}>
-          {property.title}
+        <h3 className={`${compact ? 'text-lg' : 'text-xl'} font-medium mb-1 truncate`}>
+          {property.property_url ? (
+            <a
+              href={property.property_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {property.title}
+            </a>
+          ) : (
+            property.title
+          )}
         </h3>
-        
-        <p className="text-sm text-gray-600 mb-3 leading-5">
-          {property.description?.substring(0, descriptionLength)}
-          {property.description?.length > descriptionLength && '...'}
-        </p>
-        
-        {/* Status Badge */}
-        <div className="mb-3">
-          <StatusBadge status={property.status} />
-        </div>
 
-        {/* Property Details */}
-        <div className="mb-2">
+        {property.description && (
+          <p className="text-xs text-gray-600 mb-2 leading-5">
+            {property.description.substring(0, descriptionLength)}
+            {property.description.length > descriptionLength && '...'}
+          </p>
+        )}
+        
+        {/* Structured Property Details */}
+        <div className="mb-2 space-y-1">
+          {(property.status || property.property_type || property.sub_type) && (
+            <p className="text-xs text-gray-700 flex items-center flex-wrap gap-1">
+              {property.status && <StatusBadge status={property.status} />}
+              {(property.property_type || property.sub_type) && (
+                <>
+                  <span className="mx-1">|</span>
+                  {property.property_type && <span>🏢 {property.property_type}</span>}
+                  {property.sub_type && (
+                    <>
+                      {property.property_type && <span className="mx-1">|</span>}
+                      <span>🏷️ {property.sub_type}</span>
+                    </>
+                  )}
+                </>
+              )}
+            </p>
+          )}
           {property.location && (
-            <p className="text-xs text-gray-500 mb-1">
-              📍 {property.location}
+            <p className="text-xs text-gray-700">📍 {property.location}</p>
+          )}
+          {(property.price || property.cap_rate) && (
+            <p className="text-xs text-gray-700">
+              {[
+                property.price ? `💰 ${formatPrice(property.price)}` : null,
+                property.cap_rate ? `📈 ${String(property.cap_rate)}` : null,
+              ].filter(Boolean).join(' | ')}
             </p>
           )}
-          {property.price && (
-            <p className="text-xs text-gray-500 mb-1">
-              💰 {formatPrice(property.price)}
+          {(property.square_feet || property.price_per_ft) && (
+            <p className="text-xs text-gray-700">
+              {[
+                property.square_feet ? `📐 ${property.square_feet} ft²` : null,
+                property.price_per_ft ? `💵 $${Math.round(property.price_per_ft).toLocaleString()}/ft²` : null,
+              ].filter(Boolean).join(' | ')}
             </p>
           )}
-          {property.bedrooms && property.bathrooms && (
-            <p className="text-xs text-gray-500 mb-1">
-              🏠 {property.bedrooms} bed, {property.bathrooms} bath
+          {(property.acre || property.year_built) && (
+            <p className="text-xs text-gray-700">
+              {[
+                property.acre ? `🌿 ${property.acre} acres` : null,
+                property.year_built ? `🏗️ ${property.year_built}` : null,
+              ].filter(Boolean).join(' | ')}
             </p>
+          )}
+
+          {property.email_source && (
+            <p className="text-xs text-gray-700">📧 {property.email_source}</p>
+          )}
+          {(property.email_date || property.createdAt) && (
+            <p className="text-xs text-gray-700">📅 {formatDate(property.email_date || property.createdAt)}</p>
           )}
         </div>
-
-        {/* Email Source & Date */}
-        <p className="text-xs text-gray-500 mb-1">
-          📧 {property.email_source}
-        </p>
-        <p className="text-xs text-gray-500">
-          📅 {formatDate(property.createdAt)}
-        </p>
       </div>
 
       {/* Action Buttons */}

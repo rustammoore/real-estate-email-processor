@@ -15,7 +15,7 @@ import {
   Tooltip,
   LinearProgress,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, OpenInFull as OpenInFullIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, OpenInFull as OpenInFullIcon, ArrowUpward as ArrowUpwardIcon, ArrowDownward as ArrowDownwardIcon } from '@mui/icons-material';
 import { normalizeImages, sanitizeImages, optimizeImageFile } from '../../utils/images';
 import api from '../../services/api';
 
@@ -60,6 +60,17 @@ export default function ImageManager({
     const next = urls.filter((_, i) => i !== index);
     commit(next.length ? next : ['']);
   };
+
+  const moveUrl = (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= urls.length || fromIndex === toIndex) return;
+    const next = [...urls];
+    const [item] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, item);
+    commit(next);
+  };
+
+  const handleMoveUp = (index) => moveUrl(index, index - 1);
+  const handleMoveDown = (index) => moveUrl(index, index + 1);
 
   const handleClickUpload = () => {
     if (fileInputRef.current) fileInputRef.current.click();
@@ -211,11 +222,16 @@ export default function ImageManager({
           )}
         </Grid>
 
-        {/* Right: URL inputs and actions */}
+        {/* Right: URL inputs and actions with reordering */}
         <Grid item xs={12} sm>
           <Box>
             {urls.map((url, index) => (
               <Box key={`img-${index}`} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 0.5 }}>
+                {String(url).trim() !== '' && (
+                  <Card sx={{ width: 72, height: 54, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CardMedia component="img" image={url} alt={`Thumb ${index + 1}`} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </Card>
+                )}
                 <TextField
                   fullWidth
                   label={`Image URL ${index + 1}`}
@@ -225,6 +241,12 @@ export default function ImageManager({
                   margin="dense"
                   placeholder="https://images.unsplash.com/photo-..."
                 />
+                <IconButton onClick={() => handleMoveUp(index)} size="small" disabled={index === 0} title="Move up">
+                  <ArrowUpwardIcon fontSize="small" />
+                </IconButton>
+                <IconButton onClick={() => handleMoveDown(index)} size="small" disabled={index === urls.length - 1} title="Move down">
+                  <ArrowDownwardIcon fontSize="small" />
+                </IconButton>
                 {urls.length > 1 && (
                   <IconButton onClick={() => handleRemove(index)} color="error" size="small">
                     <DeleteIcon />
