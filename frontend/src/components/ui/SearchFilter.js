@@ -58,6 +58,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
 
   // Saved Views state
   const [views, setViews] = useState([]);
+  const [allViews, setAllViews] = useState([]);
   const [isLoadingViews, setIsLoadingViews] = useState(false);
   const [selectedViewId, setSelectedViewId] = useState('');
   const [newViewName, setNewViewName] = useState('');
@@ -84,11 +85,15 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     const load = async () => {
       try {
         setIsLoadingViews(true);
-        const data = await api.listViews(pageKey);
+        const [pageViews, globalViews] = await Promise.all([
+          api.listViews(pageKey),
+          api.listAllViews().catch(() => [])
+        ]);
         if (!mounted) return;
-        setViews(Array.isArray(data) ? data : []);
+        setViews(Array.isArray(pageViews) ? pageViews : []);
+        setAllViews(Array.isArray(globalViews) ? globalViews : []);
         // Apply default view if present and no current search/filters
-        const defaultView = (Array.isArray(data) ? data : []).find(v => v.isDefault);
+        const defaultView = (Array.isArray(pageViews) ? pageViews : []).find(v => v.isDefault);
         const hasLocalState = Boolean(searchState.searchTerm) || Object.keys(searchState.filters || {}).length > 0;
         if (defaultView && !hasLocalState) {
           applyViewState(defaultView);
@@ -134,7 +139,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
       setSelectedViewId('');
       return;
     }
-    const view = views.find(v => String(v.id) === String(id));
+    const view = views.concat(allViews).find(v => String(v.id) === String(id));
     if (view) {
       applyViewState(view);
       setSelectedViewId(id);
@@ -776,6 +781,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                 const value = e.target.value;
                 setSelectedViewId(value);
               }}
+              renderValue={(value) => {
+                if (!value) return 'None';
+                const v = views.concat(allViews).find(x => String(x.id) === String(value));
+                return v ? v.name : 'None';
+              }}
               disabled={isLoadingViews}
             >
               <MenuItem value="">
@@ -786,6 +796,18 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                   {v.name}{v.isDefault ? ' • default' : ''}
                 </MenuItem>
               ))}
+              {allViews.filter(v => v.pageKey !== pageKey).length > 0 && (
+                <MenuItem disabled value="__separator__">
+                  <em>Templates from other pages</em>
+                </MenuItem>
+              )}
+              {allViews
+                .filter(v => v.pageKey !== pageKey)
+                .map((v) => (
+                  <MenuItem key={v.id} value={v.id}>
+                    {v.name} — {v.pageKey}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
           <TextField

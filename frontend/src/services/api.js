@@ -375,6 +375,12 @@ export const listViews = async (pageKey) => {
   return items.map(v => ({ ...v, id: String(v.id || v._id) }));
 };
 
+export const listAllViews = async () => {
+  const response = await client.get(`/views/all`);
+  const items = Array.isArray(response.data?.items) ? response.data.items : (Array.isArray(response.data) ? response.data : []);
+  return items.map(v => ({ ...v, id: String(v.id || v._id) }));
+};
+
 export const createView = async (payload) => {
   const response = await client.post(`/views`, payload);
   return response.data;
@@ -406,5 +412,6 @@ apiService.updateView = updateView;
 apiService.deleteView = deleteView;
 apiService.setDefaultView = setDefaultView;
 apiService.clearDefaultView = clearDefaultView;
+apiService.listAllViews = listAllViews;
 
 export default apiService; 

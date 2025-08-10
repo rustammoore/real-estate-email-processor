@@ -28,6 +28,19 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// List all views for the authenticated user (across pages)
+router.get('/all', protect, async (req, res) => {
+  try {
+    const views = await SavedView.find({ owner: req.user._id })
+      .sort({ pageKey: 1, isDefault: -1, updatedAt: -1 })
+      .lean();
+    res.json({ items: views });
+  } catch (error) {
+    console.error('Error listing all saved views:', error);
+    res.status(500).json({ error: 'Failed to list all saved views' });
+  }
+});
+
 // Create new view (private by default)
 router.post('/', protect, async (req, res) => {
   try {
