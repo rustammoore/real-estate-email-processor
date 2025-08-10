@@ -26,7 +26,8 @@ const FollowUps = () => {
 
   const loadFollowUps = async () => {
     try {
-      setLoading(true);
+      // Avoid full-page spinner on refreshes after initial load
+      setLoading(allFollowUps.length === 0);
       setError(null);
       // Fetch non-deleted and deleted to support toggles
       const [normalProps, deletedProps] = await Promise.all([
@@ -99,7 +100,8 @@ const FollowUps = () => {
     loadFollowUps();
   };
 
-  if (loading) return <LoadingSpinner />;
+  // Only block the page with a spinner on the initial load
+  if (loading && allFollowUps.length === 0) return <LoadingSpinner />;
   if (error) return <div className="error-message">{error}</div>;
 
   const filteredDue = filterProperties(followUpsDue);
