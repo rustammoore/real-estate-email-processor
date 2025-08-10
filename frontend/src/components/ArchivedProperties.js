@@ -16,7 +16,7 @@ import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
 import { useArchivedProperties } from '../hooks/useArchivedProperties';
 import { useSearch } from '../contexts/SearchContext';
-import { toggleArchive, updateProperty } from '../services/api';
+import { toggleArchive, updateProperty, deleteProperty as deletePropertyApi } from '../services/api';
 
 function ArchivedProperties() {
   const [message, setMessage] = useState('');
@@ -71,6 +71,20 @@ function ArchivedProperties() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      await Promise.all(ids.map((id) => deletePropertyApi(id)));
+      setMessage(`${ids.length} propert${ids.length === 1 ? 'y' : 'ies'} moved to Deleted!`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      fetchArchivedProperties();
+    } catch (error) {
+      setMessage('Error deleting selected: ' + (error?.message || 'Unknown error'));
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ mb: 3 }}>
@@ -99,6 +113,14 @@ function ArchivedProperties() {
                   disabled={selectedIds.size === 0}
                 >
                   Unarchive Selected
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="error" 
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0}
+                >
+                  Delete Selected
                 </Button>
                 <Button variant="text" onClick={toggleSelectionMode}>
                   Done
@@ -160,7 +182,7 @@ function ArchivedProperties() {
         )}
         variant="outlined"
         compact={false}
-        showFollowUpBadge={false}
+        showFollowUpBadge={true}
       />
 
       

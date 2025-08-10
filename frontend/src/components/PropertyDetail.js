@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, Typography, Button, TextField, Grid, Box, Chip, ImageList, ImageListItem, FormControl, InputLabel, Select, MenuItem, Alert } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
-import { EyeIcon, PencilIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PencilIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import api from '../services/api';
 import { PROPERTY_CONTEXTS, getFieldsForContext, PROPERTY_SECTIONS, getEnumOptions } from '../constants/propertySchema';
 import PropertyPageLayout from './layout/PropertyPageLayout';
@@ -93,7 +93,13 @@ function PropertyDetail() {
 
   const handleSave = async () => {
     try {
-      const resp = await api.updateProperty(id, formData);
+      // Normalize state similar to create flow to avoid backend validation errors
+      const payload = { ...formData };
+      if (payload.state) {
+        const normalized = String(payload.state).replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+        if (normalized.length === 2) payload.state = normalized; else payload.state = undefined;
+      }
+      const resp = await api.updateProperty(id, payload);
       const updated = resp?.property || null;
       setMessage('Property updated successfully!');
       setEditing(false);
@@ -203,6 +209,26 @@ function PropertyDetail() {
               >
                 <EyeIcon className="w-4 h-4" />
               </button>
+              {/* Edit */}
+              {/* Reviewed Toggle */}
+              <button
+                onClick={async () => {
+                  try {
+                    const updated = await api.toggleReviewed(property.id);
+                    showSuccess(updated.message || 'Updated', 'Success');
+                    // refresh current property data
+                    await fetchProperty();
+                    try { window.dispatchEvent(new CustomEvent('property:updated', { detail: updated })); } catch (_) {}
+                  } catch (e) {
+                    showError(e.message || 'Failed to update reviewed', 'Error');
+                  }
+                }}
+                title={property.reviewed ? 'Unmark Reviewed' : 'Mark Reviewed'}
+                className={`w-8 h-8 ${property.reviewed ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'} text-white rounded-md flex items-center justify-center transition-colors`}
+              >
+                <CheckCircleIcon className="w-4 h-4" />
+              </button>
+
               {/* Edit */}
               <button
                 onClick={() => setEditing(true)}
@@ -559,6 +585,12 @@ function PropertyDetail() {
                     label="Archived"
                     color={property.archived ? 'warning' : 'default'}
                     variant={property.archived ? 'filled' : 'outlined'}
+                  />
+                  <Chip
+                    size="small"
+                    label="Reviewed"
+                    color={property.reviewed ? 'success' : 'default'}
+                    variant={property.reviewed ? 'filled' : 'outlined'}
                   />
                   {(() => {
                     const ratingValue = Number(property.rating);

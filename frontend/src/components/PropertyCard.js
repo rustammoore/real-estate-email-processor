@@ -3,7 +3,8 @@ import {
   BuildingOfficeIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from './ui/StatusBadge';
@@ -13,6 +14,7 @@ import FollowUpActions from './ui/FollowUpActions';
 import { parseImages, formatDate, formatPrice, computePricePerFt, getStateColor } from '../utils';
 import { UI_CONSTANTS } from '../constants';
 import ConfirmationDialog from './ui/ConfirmationDialog';
+import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 
 function PropertyCard({ 
@@ -41,6 +43,13 @@ function PropertyCard({
   const images = parseImages(property.images);
 
   const handleDelete = () => {
+    // If parent provides onDelete, defer confirmation to parent and do not open local dialog
+    if (onDelete) {
+      try {
+        onDelete(property.id);
+      } catch (_) {}
+      return;
+    }
     setConfirmOpen(true);
   };
   const handleCancelDelete = () => setConfirmOpen(false);
@@ -247,6 +256,25 @@ function PropertyCard({
             >
               <EyeIcon className="w-4 h-4" />
             </button>
+
+            {/* Reviewed Toggle */}
+            <button
+              onClick={async () => {
+                try {
+                  const updated = await api.toggleReviewed(property.id);
+                  if (onPropertyUpdate) onPropertyUpdate(updated);
+                  if (onUpdate) onUpdate(updated);
+                  try { window.dispatchEvent(new CustomEvent('property:updated', { detail: updated })); } catch (_) {}
+                  showSuccess(updated.message || 'Updated', 'Success');
+                } catch (e) {
+                  showError(e.message || 'Failed to update reviewed', 'Error');
+                }
+              }}
+              title={property.reviewed ? 'Unmark Reviewed' : 'Mark Reviewed'}
+              className={`w-8 h-8 ${property.reviewed ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'} text-white rounded-md flex items-center justify-center transition-colors`}
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+            </button>
             
             {/* Edit Button */}
             <button
@@ -293,18 +321,20 @@ function PropertyCard({
         </div>
       )}
 
-      {/* Confirm Delete dialog for card */}
-      <ConfirmationDialog
-        open={confirmOpen}
-        title="Delete Property"
-        message="Are you sure you want to delete this property? This action can be undone from Deleted items."
-        confirmText="Delete"
-        cancelText="Cancel"
-        severity="error"
-        onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
-        loading={isDeleting}
-      />
+      {/* Confirm Delete dialog for card (only when no parent onDelete is provided) */}
+      {!onDelete && (
+        <ConfirmationDialog
+          open={confirmOpen}
+          title="Delete Property"
+          message="Are you sure you want to delete this property? This action can be undone from Deleted items."
+          confirmText="Delete"
+          cancelText="Cancel"
+          severity="error"
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+          loading={isDeleting}
+        />
+      )}
     </div>
   );
 }

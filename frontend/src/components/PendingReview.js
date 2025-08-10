@@ -43,7 +43,7 @@ function PendingReview() {
   const [showRegular, setShowRegular] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
-  const [compareDialog, setCompareDialog] = useState({ open: false, duplicate: null, original: null });
+  const [compareDialog, setCompareDialog] = useState({ open: false, duplicate: null, original: null, allConflicts: [] });
   const { fetchPendingReview } = usePendingReview();
   const { filterProperties, updateDynamicFields } = useSearch();
   const { showSuccess, showError } = useToast();
@@ -106,6 +106,8 @@ function PendingReview() {
       showSuccess('Property rejected successfully!', 'Success');
       fetchPendingProperties();
       fetchPendingReview();
+      // Navigate to Deleted so user can see the moved item
+      navigate('/deleted-properties');
     } catch (error) {
       showError(error.message || 'Error rejecting property', 'Error');
     } finally {
@@ -116,19 +118,11 @@ function PendingReview() {
 
   const handleCompare = async (duplicate) => {
     try {
-      let original;
-      try {
-        original = await api.getOriginalProperty(duplicate.id);
-      } catch (e) {
-        // If the duplicate doesn't link to original, try the inverse:
-        // If this card is actually the original demoted to pending and links to the promoted item, fetch that instead
-        if (duplicate.duplicate_of) {
-          original = await api.getProperty(duplicate.duplicate_of?._id || duplicate.duplicate_of);
-        } else {
-          throw e;
-        }
-      }
-      setCompareDialog({ open: true, duplicate, original });
+      const [original, conflicts] = await Promise.all([
+        api.getOriginalProperty(duplicate.id),
+        api.getConflicts(duplicate.id)
+      ]);
+      setCompareDialog({ open: true, duplicate, original, allConflicts: conflicts });
     } catch (error) {
       setMessage('Error loading original property: ' + error.message);
     }
@@ -277,23 +271,35 @@ function PendingReview() {
         onClose={closeCompareDialog}
         maxWidth="lg"
         fullWidth
+        scroll="paper"
       >
         <DialogTitle>Compare Properties</DialogTitle>
-        <DialogContent>
+        <DialogContent dividers sx={{ maxHeight: '70vh' }}>
           {compareDialog.duplicate && compareDialog.original && (
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
-                  Duplicate Property
+                  Selected Property
                 </Typography>
                 <PropertyComparisonCard property={compareDialog.duplicate} />
               </Grid>
               <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Original Property
-                </Typography>
                 <PropertyComparisonCard property={compareDialog.original} />
               </Grid>
+              {Array.isArray(compareDialog.allConflicts) && compareDialog.allConflicts.length > 0 && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle1" gutterBottom>Other Conflicts</Typography>
+                  <Grid container spacing={2}>
+                    {compareDialog.allConflicts
+                      .filter((p) => p.id !== compareDialog.duplicate?.id && p.id !== compareDialog.original?.id)
+                      .map((p) => (
+                        <Grid item xs={12} sm={6} md={4} key={p.id}>
+                          <PropertyComparisonCard property={p} />
+                        </Grid>
+                      ))}
+                  </Grid>
+                </Grid>
+              )}
             </Grid>
           )}
         </DialogContent>
@@ -304,7 +310,8 @@ function PendingReview() {
               variant="contained"
               color="success"
               onClick={() => {
-                handleApprove(compareDialog.duplicate.id, compareDialog.duplicate.duplicate_of?._id || compareDialog.duplicate.duplicate_of);
+                // Allow approve without requiring duplicate_of explicitly; the backend will cascade demotions
+                handleApprove(compareDialog.duplicate.id, compareDialog.original?.id || compareDialog.duplicate.duplicate_of?._id || compareDialog.duplicate.duplicate_of);
                 closeCompareDialog();
               }}
             >

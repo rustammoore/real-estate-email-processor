@@ -251,6 +251,7 @@ export const PROPERTY_FIELDS = [
   { name: 'liked', label: 'Liked', type: 'boolean', defaultValue: false, section: PROPERTY_SECTIONS.ADDITIONAL, showIn: { create: false, edit: false, view: true, search: true } },
   { name: 'loved', label: 'Loved', type: 'boolean', defaultValue: false, section: PROPERTY_SECTIONS.ADDITIONAL, showIn: { create: false, edit: false, view: true, search: true } },
   { name: 'archived', label: 'Archived', type: 'boolean', defaultValue: false, section: PROPERTY_SECTIONS.ADDITIONAL, showIn: { create: false, edit: false, view: true, search: true } },
+  { name: 'reviewed', label: 'Reviewed', type: 'boolean', defaultValue: false, section: PROPERTY_SECTIONS.ADDITIONAL, showIn: { create: false, edit: false, view: true, search: true } },
   { name: 'deleted', label: 'Deleted', type: 'boolean', defaultValue: false, section: PROPERTY_SECTIONS.ADDITIONAL, showIn: { create: false, edit: false, view: false, search: true } },
   { name: 'rating', label: 'Rating', type: 'numeric', defaultValue: 0, section: PROPERTY_SECTIONS.ADDITIONAL, showIn: { create: false, edit: false, view: true, search: true } },
   { name: 'followUpDate', label: 'Follow-up Date', type: 'date', defaultValue: null, section: PROPERTY_SECTIONS.ADDITIONAL, showIn: { create: false, edit: false, view: true, search: true } },

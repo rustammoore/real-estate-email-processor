@@ -180,6 +180,7 @@ function PropertyList() {
         onUpdate={fetchProperties}
         showFollowUpBadge={true}
         variant="outlined"
+        compact={true}
       />
 
       <ConfirmationDialog

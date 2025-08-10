@@ -4,6 +4,17 @@ const Property = require('../models/Property');
 const { protect, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
 
+// Address normalization helper
+function normalizeAddress(input = '') {
+  const str = String(input || '').toLowerCase();
+  // Collapse whitespace, remove punctuation commonly found in addresses
+  const cleaned = str
+    .replace(/[\.,#]/g, ' ') // replace punctuation with space
+    .replace(/\s+/g, ' ')    // collapse spaces
+    .trim();
+  return cleaned || null;
+}
+
 // Small helper to escape regex special chars in user input
 const escapeRegExp = (str = '') => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -39,15 +50,23 @@ router.post('/', protect, async (req, res) => {
     }
 
     // Normalize/prepare create payload
+    // Normalize state to two-letter uppercase code; drop if invalid/empty to avoid validation errors
+    const normalizedState = (typeof state === 'string')
+      ? state.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase()
+      : undefined;
+    const stateValue = normalizedState && normalizedState.length === 2 ? normalizedState : undefined;
+    const address_hash = normalizeAddress(location);
+
     const createPayload = {
       title,
       description,
       price,
       cap_rate,
       location,
+      address_hash,
       property_type,
       sub_type,
-      state,
+      state: stateValue,
       square_feet,
       acre,
       year_built,
@@ -65,18 +84,19 @@ router.post('/', protect, async (req, res) => {
       user: req.user ? req.user._id : undefined
     };
 
-    // Basic duplicate detection by location (case-insensitive exact match), excluding deleted
-    const normalizedLocation = String(location).trim();
+    // Duplicate detection via normalized address hash, excluding archived/deleted
     let originalProperty = null;
-    if (normalizedLocation) {
+    if (address_hash) {
       originalProperty = await Property.findOne({
-        location: { $regex: new RegExp(`^${escapeRegExp(normalizedLocation)}$`, 'i') },
+        address_hash,
         deleted: false,
-      }).select('-__v');
+        archived: false,
+      }).sort({ createdAt: 1 }).select('-__v');
     }
 
     let isDuplicate = false;
     if (originalProperty) {
+      // Newer property should be pending review and reference the original
       isDuplicate = true;
       createPayload.status = 'pending';
       createPayload.duplicate_of = originalProperty._id;
@@ -97,6 +117,9 @@ router.post('/', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating property:', error);
+    if (error && error.name === 'ValidationError') {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
     return res.status(500).json({ error: 'Failed to create property' });
   }
 });
@@ -192,6 +215,33 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 });
 
+// Get all properties that conflict by normalized address with the given property
+router.get('/:id/conflicts', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    const base = await Property.findById(id).select('-__v');
+    if (!base) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    const address_hash = base.address_hash || normalizeAddress(base.location || '');
+    if (!address_hash) {
+      return res.json({ items: [] });
+    }
+    const items = await Property.find({ address_hash }).sort({ createdAt: 1 }).select('-__v').lean();
+    const normalized = items.map((doc) => {
+      const { _id, ...rest } = doc;
+      return { id: String(_id || rest.id), ...rest };
+    });
+    res.json({ items: normalized });
+  } catch (error) {
+    console.error('Error fetching conflicts:', error);
+    res.status(500).json({ error: 'Failed to fetch conflicts' });
+  }
+});
+
 // Update property (requires auth) with input filtering
 router.put('/:id', protect, async (req, res) => {
   try {
@@ -203,7 +253,7 @@ router.put('/:id', protect, async (req, res) => {
     const allowedFields = [
       'title', 'description', 'price', 'location', 'property_type', 'sub_type',
       'state', 'square_feet', 'acre', 'year_built', 'bedrooms', 'bathrooms', 'status', 'cap_rate',
-      'liked', 'loved', 'rating', 'archived', 'deleted',
+      'liked', 'loved', 'rating', 'archived', 'reviewed', 'deleted',
       'followUpDate', 'followUpSet', 'lastFollowUpDate',
       'for_lease_info', 'other', 'procured', 'property_url'
     ];
@@ -214,11 +264,45 @@ router.put('/:id', protect, async (req, res) => {
         update[field] = req.body[field];
       }
     }
+    // Maintain address_hash when location changes
+    if (Object.prototype.hasOwnProperty.call(update, 'location')) {
+      const nextLocation = update.location;
+      const hash = normalizeAddress(nextLocation);
+      if (hash) {
+        update.address_hash = hash;
+        // If another active (not archived/deleted) property already has this address, mark this as pending review
+        const conflicting = await Property.findOne({
+          address_hash: hash,
+          deleted: false,
+          archived: false,
+          _id: { $ne: id },
+        }).select('_id');
+        if (conflicting) {
+          update.status = 'pending';
+        }
+      } else {
+        // Unset if location is cleared or invalid
+        update.$unset = { ...(update.$unset || {}), address_hash: '' };
+      }
+    }
+
     // Allow images updates as well when editing
     if (Object.prototype.hasOwnProperty.call(req.body, 'images')) {
       update.images = Array.isArray(req.body.images)
         ? req.body.images
         : (req.body.images ? [req.body.images] : []);
+    }
+
+    // Normalize state to two-letter uppercase or unset if invalid/empty
+    if (Object.prototype.hasOwnProperty.call(update, 'state')) {
+      const raw = typeof update.state === 'string' ? update.state : '';
+      const normalized = raw.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+      if (normalized.length === 2) {
+        update.state = normalized;
+      } else {
+        delete update.state;
+        update.$unset = { ...(update.$unset || {}), state: '' };
+      }
     }
 
     // Basic server-side validation for rating and date formats
@@ -254,6 +338,9 @@ router.put('/:id', protect, async (req, res) => {
     res.json({ success: true, message: 'Property updated successfully', property });
   } catch (error) {
     console.error('Error updating property:', error);
+    if (error && error.name === 'ValidationError') {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
     res.status(500).json({ error: 'Failed to update property' });
   }
 });
@@ -303,39 +390,38 @@ router.delete('/:id/permanent', protect, async (req, res) => {
   }
 });
 
-// Pending review: list ALL pending properties regardless of deleted flag
+// Pending review (computed): list properties where address_hash collides among active (not archived/deleted)
 router.get('/pending-review/all', optionalAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 1000 } = req.query;
-    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
-    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 1000, 1), 2000);
+    // Step 1: find address_hash groups with >1 active property
+    const groups = await Property.aggregate([
+      { $match: { deleted: false, archived: false, address_hash: { $ne: null } } },
+      { $group: { _id: '$address_hash', count: { $sum: 1 } } },
+      { $match: { count: { $gt: 1 } } },
+      { $project: { _id: 0, address_hash: '$_id' } }
+    ]);
 
-    const filter = { status: 'pending' };
+    const hashes = groups.map((g) => g.address_hash);
+    if (hashes.length === 0) {
+      return res.json({ items: [], page: 1, limit: hashes.length, total: 0, totalPages: 0 });
+    }
 
-    const query = Property.find(filter)
+    // Step 2: return all active properties for those hashes
+    const items = await Property.find({
+      address_hash: { $in: hashes },
+      deleted: false,
+      archived: false,
+    })
       .sort({ createdAt: -1 })
-      .skip((parsedPage - 1) * parsedLimit)
-      .limit(parsedLimit)
       .select('-__v')
       .lean();
 
-    const [rawItems, total] = await Promise.all([
-      query,
-      Property.countDocuments(filter)
-    ]);
-
-    const items = rawItems.map((doc) => {
+    const normalized = items.map((doc) => {
       const { _id, ...rest } = doc;
       return { id: String(_id || rest.id), ...rest };
     });
 
-    res.json({
-      items,
-      page: parsedPage,
-      limit: parsedLimit,
-      total,
-      totalPages: Math.ceil(total / parsedLimit)
-    });
+    res.json({ items: normalized, page: 1, limit: normalized.length, total: normalized.length, totalPages: 1 });
   } catch (error) {
     console.error('Error fetching pending review properties:', error);
     res.status(500).json({ error: 'Failed to fetch pending review properties' });
@@ -403,6 +489,27 @@ router.post('/pending-review/:duplicateId/approve', protect, async (req, res) =>
       return res.status(400).json({ error: "Invalid 'promote' value. Use 'duplicate' or 'original'" });
     }
 
+    // Cascade: for any other active properties sharing the same address_hash, move them to deleted pending and link to promoted
+    try {
+      const addressHash = promoted.address_hash || normalizeAddress(promoted.location || '');
+      if (addressHash) {
+        await Property.updateMany(
+          {
+            address_hash: addressHash,
+            deleted: false,
+            archived: false,
+            _id: { $ne: promoted._id },
+          },
+          {
+            $set: { status: 'pending', deleted: true, duplicate_of: promoted._id },
+          }
+        );
+      }
+    } catch (e) {
+      // Log but do not fail the main approval action
+      console.warn('Cascade demotion failed:', e?.message || e);
+    }
+
     return res.json({
       success: true,
       message: 'Duplicate approval processed',
@@ -415,7 +522,7 @@ router.post('/pending-review/:duplicateId/approve', protect, async (req, res) =>
   }
 });
 
-// Pending review: reject duplicate (archive/delete the duplicate)
+// Pending review: reject duplicate (move to deleted and keep status pending for traceability)
 router.post('/pending-review/:duplicateId/reject', protect, async (req, res) => {
   try {
     const { duplicateId } = req.params;
@@ -424,8 +531,13 @@ router.post('/pending-review/:duplicateId/reject', protect, async (req, res) => 
       return res.status(404).json({ error: 'Duplicate property not found' });
     }
 
-    // Move duplicate to deleted (soft delete) and keep status as pending for traceability
+    // Move duplicate to deleted (soft delete) and compute address_hash for consistency
     duplicate.deleted = true;
+    duplicate.archived = false;
+    duplicate.status = 'pending';
+    if (duplicate.location) {
+      duplicate.address_hash = normalizeAddress(duplicate.location);
+    }
     const saved = await duplicate.save();
 
     return res.json({ success: true, message: 'Duplicate rejected and moved to deleted', property: saved });

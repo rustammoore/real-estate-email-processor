@@ -108,6 +108,12 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
         email_date: new Date().toISOString()
       };
 
+      // Normalize state (2-letter uppercase) and drop if invalid to satisfy backend validation
+      if (propertyData.state) {
+        const normalized = String(propertyData.state).replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+        propertyData.state = normalized.length === 2 ? normalized : undefined;
+      }
+
       let response;
       
       if (mode === 'create') {
@@ -168,6 +174,8 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
       status: 'active',
       images: []
     });
+    // Also reset ImageManager by updating its value prop indirectly via formData, and give it a tick
+    setTimeout(() => setFormData((prev) => ({ ...prev, images: [] })), 0);
     // images cleared by resetting formData
   };
 
@@ -276,7 +284,15 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                               fullWidth
                               label={`${field.label}${field.required ? ' *' : ''}`}
                               value={formData[field.name] ?? ''}
-                                onChange={(e) => handleInputChange(field.name, e.target.value)}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (field.name === 'state') {
+                                  const normalized = raw.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+                                  handleInputChange('state', normalized);
+                                } else {
+                                  handleInputChange(field.name, raw);
+                                }
+                              }}
                               required={Boolean(field.required)}
                               margin="dense"
                               multiline={Boolean(field.ui?.multiline) || field.name === 'description'}

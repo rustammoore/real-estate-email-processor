@@ -47,6 +47,19 @@ export default function ImageManager({
     }
   }, [initial, isReadOnly]);
 
+  // Also sync in create/edit when parent resets or changes externally (e.g., after successful submit)
+  useEffect(() => {
+    if (!isReadOnly) {
+      const next = normalizeImages(value);
+      const currentSanitized = sanitizeImages(urls);
+      const nextSanitized = sanitizeImages(next);
+      if (JSON.stringify(currentSanitized) !== JSON.stringify(nextSanitized)) {
+        setUrls(next.length ? next : ['']);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, isReadOnly]);
+
   const commit = (next) => {
     const cleaned = sanitizeImages(next);
     setUrls(next);

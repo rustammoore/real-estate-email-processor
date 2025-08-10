@@ -47,13 +47,17 @@ client.interceptors.response.use(
 );
 
 // Properties API
-const normalizeListResponse = (data) => Array.isArray(data) ? data : (data?.items || []);
+// Normalize list responses to a flat array of client-normalized properties
+const normalizeListResponse = (data) => {
+  const items = Array.isArray(data) ? data : (data?.items || []);
+  return items.map((p) => toClientProperty(p));
+};
 
 // Ensure every property object has a stable string id
 const toClientProperty = (prop) => {
   if (!prop || typeof prop !== 'object') return prop;
   const idValue = prop.id || prop._id;
-  return idValue ? { id: String(idValue), ...prop } : { ...prop };
+  return idValue ? { ...prop, id: String(idValue) } : { ...prop };
 };
 
 const buildQuery = (params = {}) => {
@@ -141,6 +145,13 @@ export const toggleArchive = async (id) => {
   return { ...toClientProperty(response.data.property), message: archived ? 'Property archived' : 'Property unarchived' };
 };
 
+export const toggleReviewed = async (id) => {
+  const current = await client.get(`/properties/${id}`);
+  const reviewed = !Boolean(current.data?.reviewed);
+  const response = await client.put(`/properties/${id}`, { reviewed });
+  return { ...toClientProperty(response.data.property), message: reviewed ? 'Marked reviewed' : 'Review cleared' };
+};
+
 export const setRating = async (id, rating) => {
   const response = await client.put(`/properties/${id}`, { rating });
   return { ...toClientProperty(response.data.property), message: 'Rating updated' };
@@ -149,7 +160,8 @@ export const setRating = async (id, rating) => {
 // Archived properties API
 export const getArchivedProperties = async () => {
   const response = await client.get(`/properties${buildQuery({ archived: true, page: 1, limit: DEFAULT_LIST_LIMIT })}`);
-  return normalizeListResponse(response.data);
+  // Ensure archived flag is present for consistent card badges
+  return normalizeListResponse(response.data).map((p) => ({ archived: true, ...p }));
 };
 
 export const getArchivedPropertiesCount = async () => {
@@ -169,7 +181,8 @@ export const getPendingReviewProperties = async () => {
 export const getDeletedProperties = async () => {
   // Ask backend specifically for deleted
   const response = await client.get(`/properties${buildQuery({ deleted: true, page: 1, limit: DEFAULT_LIST_LIMIT })}`);
-  return normalizeListResponse(response.data);
+  // Ensure deleted flag is present for consistent card badges
+  return normalizeListResponse(response.data).map((p) => ({ deleted: true, ...p }));
 };
 
 // Follow-up API
@@ -244,18 +257,30 @@ export const rejectDuplicate = async (id) => {
 };
 
 export const getOriginalProperty = async (duplicateId) => {
-  // Step 1: fetch the duplicate to discover its original id
+  // Try direct linkage first
   const duplicateResponse = await client.get(`/properties/${duplicateId}`);
   const duplicate = duplicateResponse.data;
-
   const originalId = duplicate?.duplicate_of?._id || duplicate?.duplicate_of;
-  if (!originalId) {
+  if (originalId) {
+    const originalResponse = await client.get(`/properties/${originalId}`);
+    return originalResponse.data;
+  }
+  // Fallback: use address hash conflicts to find peers
+  const conflictsResponse = await client.get(`/properties/${duplicateId}/conflicts`);
+  const items = Array.isArray(conflictsResponse.data?.items) ? conflictsResponse.data.items : [];
+  // Choose an original heuristic: earliest createdAt among conflicts, excluding the current id
+  const candidates = items.filter((p) => String(p.id) !== String(duplicateId));
+  if (candidates.length === 0) {
     throw new Error('Original property is not linked to this duplicate.');
   }
+  const sorted = candidates.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  return sorted[0];
+};
 
-  // Step 2: fetch the original property
-  const originalResponse = await client.get(`/properties/${originalId}`);
-  return originalResponse.data;
+export const getConflicts = async (id) => {
+  const response = await client.get(`/properties/${id}/conflicts`);
+  const items = Array.isArray(response.data?.items) ? response.data.items : [];
+  return items.map((p) => toClientProperty(p));
 };
 
 // Follow-ups API (computed client-side from all properties)
@@ -309,6 +334,7 @@ const apiService = {
   toggleLove,
   toggleArchive,
   setRating,
+  toggleReviewed,
   getArchivedProperties,
   getArchivedPropertiesCount,
   getPendingReviewProperties,
@@ -322,6 +348,7 @@ const apiService = {
   approveDuplicate,
   rejectDuplicate,
   getOriginalProperty,
+  getConflicts,
   // deletion/restore helpers
   restoreProperty,
   permanentlyDeleteProperty,

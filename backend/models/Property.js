@@ -107,7 +107,8 @@ const propertySchema = new mongoose.Schema({
   },
   address_hash: {
     type: String,
-    trim: true
+    trim: true,
+    index: true
   },
   liked: {
     type: Boolean,
@@ -124,6 +125,10 @@ const propertySchema = new mongoose.Schema({
     default: 0
   },
   archived: {
+    type: Boolean,
+    default: false
+  },
+  reviewed: {
     type: Boolean,
     default: false
   },
