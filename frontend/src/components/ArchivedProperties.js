@@ -38,7 +38,7 @@ function ArchivedProperties() {
     }
   };
 
-  const filteredProperties = useMemo(() => filterProperties(archivedProperties), [archivedProperties, filterProperties]);
+  const filteredProperties = useMemo(() => filterProperties(archivedProperties, 'archived'), [archivedProperties, filterProperties]);
 
   const toggleSelectionMode = () => {
     setSelectionMode((prev) => {
@@ -196,6 +196,7 @@ function ArchivedProperties() {
         variant="outlined"
         compact={false}
         showFollowUpBadge={true}
+        pageKey="archived"
       />
 
       

@@ -35,15 +35,19 @@ import { PROPERTY_FIELDS } from '../../constants/propertySchema';
 
 function SearchFilter({ properties = [], variant = 'default', showAdvanced = true, pageKey = 'default' }) {
   const {
-    searchState,
+    getSearchState,
     setSearchTerm,
     setFilter,
     clearFilter,
     clearAllFilters,
     setSort,
-    availableFields,
+    setGroupBy,
+    getAvailableFields,
     getFieldType
   } = useSearch();
+
+  const searchState = getSearchState(pageKey);
+  const availableFields = getAvailableFields(pageKey);
 
   const [showFilters, setShowFilters] = useState(false);
   const [localSearchTerm, setLocalSearchTerm] = useState(searchState.searchTerm);
@@ -51,6 +55,9 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   const [pendingFilters, setPendingFilters] = useState(searchState.filters);
   const [pendingSortBy, setPendingSortBy] = useState(searchState.sortBy);
   const [pendingSortOrder, setPendingSortOrder] = useState(searchState.sortOrder);
+  const [pendingGroupByField, setPendingGroupByField] = useState(searchState.groupBy?.field || '');
+  const [pendingGroupByOrder, setPendingGroupByOrder] = useState(searchState.groupBy?.order || 'asc');
+  const [pendingGroupByInterval, setPendingGroupByInterval] = useState(searchState.groupBy?.interval || '');
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
   // Local drafts for numeric inputs to avoid aggressive re-formatting while typing
   const [inputDrafts, setInputDrafts] = useState({}); // key: `${fieldName}-min|max` -> string
@@ -74,9 +81,9 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   // Debounced search for compact/no-advanced mode only
   const debouncedSearch = React.useMemo(
     () => debounce((value) => {
-      setSearchTerm(value);
+      setSearchTerm(value, pageKey);
     }, 300),
-    [setSearchTerm]
+    [setSearchTerm, pageKey]
   );
 
   // Load saved views for this page
@@ -114,16 +121,28 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     if (!view) return;
     // Apply search
     setLocalSearchTerm(view.searchTerm || '');
-    setSearchTerm(view.searchTerm || '');
+    setSearchTerm(view.searchTerm || '', pageKey);
     // Apply filters: clear existing then set new
-    Object.keys(searchState.filters || {}).forEach((field) => clearFilter(field));
+    Object.keys(searchState.filters || {}).forEach((field) => clearFilter(field, pageKey));
     setPendingFilters(view.filters || {});
-    Object.entries(view.filters || {}).forEach(([field, value]) => setFilter(field, value));
+    Object.entries(view.filters || {}).forEach(([field, value]) => setFilter(field, value, pageKey));
     // Apply sort
     if (view.sortBy) {
       setPendingSortBy(view.sortBy);
       setPendingSortOrder(view.sortOrder || 'desc');
-      setSort(view.sortBy, view.sortOrder || 'desc');
+      setSort(view.sortBy, view.sortOrder || 'desc', pageKey);
+    }
+    // Apply group-by
+    if (view.groupBy && view.groupBy.field) {
+      setPendingGroupByField(view.groupBy.field || '');
+      setPendingGroupByOrder(view.groupBy.order || 'asc');
+      setPendingGroupByInterval(view.groupBy.interval || '');
+      setGroupBy({ field: view.groupBy.field, order: view.groupBy.order || 'asc', interval: view.groupBy.interval || undefined }, pageKey);
+    } else {
+      setPendingGroupByField('');
+      setPendingGroupByOrder('asc');
+      setPendingGroupByInterval('');
+      setGroupBy(null, pageKey);
     }
     setHasPendingChanges(false);
   };
@@ -132,9 +151,14 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     if (!id) {
       // Apply None: clear search and filters, keep current sort settings
       setLocalSearchTerm('');
-      setSearchTerm('');
+      setSearchTerm('', pageKey);
       setPendingFilters({});
-      Object.keys(searchState.filters || {}).forEach((field) => clearFilter(field));
+      Object.keys(searchState.filters || {}).forEach((field) => clearFilter(field, pageKey));
+      // Clear grouping when selecting None
+      setPendingGroupByField('');
+      setPendingGroupByOrder('asc');
+      setPendingGroupByInterval('');
+      setGroupBy(null, pageKey);
       setHasPendingChanges(false);
       setSelectedViewId('');
       return;
@@ -155,6 +179,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
       filters: pendingFilters,
       sortBy: pendingSortBy,
       sortOrder: pendingSortOrder,
+      groupBy: pendingGroupByField ? { field: pendingGroupByField, order: pendingGroupByOrder, interval: pendingGroupByInterval || undefined } : null,
     };
     try {
       const created = await api.createView(payload);
@@ -255,24 +280,30 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   const handleApply = () => {
     // Apply search term if changed
     if (localSearchTerm !== searchState.searchTerm) {
-      setSearchTerm(localSearchTerm);
+      setSearchTerm(localSearchTerm, pageKey);
     }
     // Remove filters that were cleared locally
     Object.keys(searchState.filters).forEach((field) => {
       const pendingValue = pendingFilters[field];
       if (pendingValue === undefined || pendingValue === '' || pendingValue === null) {
-        clearFilter(field);
+        clearFilter(field, pageKey);
       }
     });
     // Apply pending filters
     Object.entries(pendingFilters).forEach(([field, value]) => {
       if (!(value === undefined || value === '' || value === null)) {
-        setFilter(field, value);
+        setFilter(field, value, pageKey);
       }
     });
     // Apply sorting
     if (pendingSortBy !== searchState.sortBy || pendingSortOrder !== searchState.sortOrder) {
-      setSort(pendingSortBy, pendingSortOrder);
+      setSort(pendingSortBy, pendingSortOrder, pageKey);
+    }
+    // Apply grouping
+    const currentGroup = searchState.groupBy || null;
+    const nextGroup = pendingGroupByField ? { field: pendingGroupByField, order: pendingGroupByOrder, interval: pendingGroupByInterval || undefined } : null;
+    if (JSON.stringify(currentGroup) !== JSON.stringify(nextGroup)) {
+      setGroupBy(nextGroup, pageKey);
     }
     setShowFilters(false);
     setHasPendingChanges(false);
@@ -284,6 +315,9 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
       setPendingFilters(searchState.filters);
       setPendingSortBy(searchState.sortBy);
       setPendingSortOrder(searchState.sortOrder);
+      setPendingGroupByField(searchState.groupBy?.field || '');
+      setPendingGroupByOrder(searchState.groupBy?.order || 'asc');
+      setPendingGroupByInterval(searchState.groupBy?.interval || '');
       // Keep pending flag if local search differs from committed state
       setHasPendingChanges(localSearchTerm !== searchState.searchTerm);
     }
@@ -686,8 +720,8 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               <InputAdornment position="end">
                 <IconButton size="small" onClick={() => {
                   setLocalSearchTerm('');
-                  if (variant === 'compact' || !showAdvanced) {
-                    setSearchTerm('');
+                   if (variant === 'compact' || !showAdvanced) {
+                     setSearchTerm('', pageKey);
                   } else {
                     setHasPendingChanges(searchState.searchTerm !== '');
                   }
@@ -723,8 +757,8 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               <InputAdornment position="end">
                 <IconButton size="small" onClick={() => {
                   setLocalSearchTerm('');
-                  if (variant === 'compact' || !showAdvanced) {
-                    setSearchTerm('');
+                   if (variant === 'compact' || !showAdvanced) {
+                     setSearchTerm('', pageKey);
                   } else {
                     setHasPendingChanges(searchState.searchTerm !== '');
                   }
@@ -844,7 +878,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
       )}
 
       {/* Active Filters Display */}
-      {activeFiltersCount > 0 && (
+      {(activeFiltersCount > 0 || (searchState.sortBy && (searchState.sortBy !== 'createdAt' || searchState.sortOrder !== 'desc')) || (searchState.groupBy && searchState.groupBy.field)) && (
         <Box display="flex" gap={1} mb={2} flexWrap="wrap" alignItems="center">
           <Typography variant="body2" color="textSecondary">Active filters:</Typography>
           {Object.entries(searchState.filters).map(([fieldName, value]) => {
@@ -871,13 +905,31 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               <Chip
                 key={fieldName}
                 label={`${field?.label || fieldName}: ${displayValue}`}
-                onDelete={() => clearFilter(fieldName)}
+                onDelete={() => clearFilter(fieldName, pageKey)}
                 size="small"
                 variant="outlined"
               />
             );
           })}
-          <Button size="small" onClick={clearAllFilters}>Clear All</Button>
+          {(searchState.sortBy && (searchState.sortBy !== 'createdAt' || searchState.sortOrder !== 'desc')) && (
+            <Chip
+              key="__sort__"
+              label={`Sort: ${(availableFields.find(f => f.name === searchState.sortBy)?.label) || searchState.sortBy} (${searchState.sortOrder === 'desc' ? 'Desc' : 'Asc'})`}
+              onDelete={() => setSort('createdAt', 'desc', pageKey)}
+              size="small"
+              variant="outlined"
+            />
+          )}
+          {(searchState.groupBy && searchState.groupBy.field) && (
+            <Chip
+              key="__group__"
+              label={`Group: ${(availableFields.find(f => f.name === searchState.groupBy.field)?.label) || searchState.groupBy.field}${searchState.groupBy.interval ? ` • ${String(searchState.groupBy.interval).charAt(0).toUpperCase()}${String(searchState.groupBy.interval).slice(1)}` : ''} (${searchState.groupBy.order === 'desc' ? 'Desc' : 'Asc'})`}
+              onDelete={() => setGroupBy(null, pageKey)}
+              size="small"
+              variant="outlined"
+            />
+          )}
+          <Button size="small" onClick={() => clearAllFilters(pageKey)}>Clear All</Button>
         </Box>
       )}
 
@@ -921,6 +973,61 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                 </Grid>
               </Grid>
             </Grid>
+            {/* Group By Controls */}
+            <Grid item xs={12}>
+              <Grid container spacing={1} alignItems="center">
+                <Grid item xs={12} md={4}>
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Group By</InputLabel>
+                    <Select
+                      value={pendingGroupByField}
+                      label="Group By"
+                      onChange={(e) => { setPendingGroupByField(e.target.value); setHasPendingChanges(true); }}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {availableFields
+                        .filter(f => f.type !== 'special' && f.type !== 'array')
+                        .map(field => (
+                          <MenuItem key={field.name} value={field.name}>
+                            {field.label}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                {/* Interval for date fields */}
+                <Grid item xs={12} md={4}>
+                  <FormControl size="small" fullWidth disabled={!pendingGroupByField || (availableFields.find(f => f.name === pendingGroupByField)?.type !== 'date')}>
+                    <InputLabel>Interval</InputLabel>
+                    <Select
+                      value={pendingGroupByInterval}
+                      label="Interval"
+                      onChange={(e) => { setPendingGroupByInterval(e.target.value); setHasPendingChanges(true); }}
+                    >
+                      <MenuItem value="">Auto</MenuItem>
+                      <MenuItem value="day">Day</MenuItem>
+                      <MenuItem value="week">Week</MenuItem>
+                      <MenuItem value="month">Month</MenuItem>
+                      <MenuItem value="quarter">Quarter</MenuItem>
+                      <MenuItem value="year">Year</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl size="small" fullWidth disabled={!pendingGroupByField}>
+                    <InputLabel>Group Order</InputLabel>
+                    <Select
+                      value={pendingGroupByOrder}
+                      label="Group Order"
+                      onChange={(e) => { setPendingGroupByOrder(e.target.value); setHasPendingChanges(true); }}
+                    >
+                      <MenuItem value="asc">Ascending</MenuItem>
+                      <MenuItem value="desc">Descending</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Grid>
 
             {/* Quick compact row: Liked, Loved, Archived, Deleted toggles + Status select */}
             {((quickBooleanFields.length > 0) || statusField || includeFollowUpSynthetic) && (
@@ -946,8 +1053,8 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                       control={
                         <Switch
                           size="small"
-                          checked={Boolean(pendingFilters[hasFollowUpField.name]) === true}
-                          onChange={(e) => { handleFilterChange(hasFollowUpField.name, e.target.checked ? true : ''); }}
+                      checked={Boolean(pendingFilters[hasFollowUpField.name]) === true}
+                      onChange={(e) => { handleFilterChange(hasFollowUpField.name, e.target.checked ? true : ''); }}
                         />
                       }
                       label={<Typography variant="caption">{hasFollowUpField.label}</Typography>}

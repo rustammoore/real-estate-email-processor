@@ -49,17 +49,26 @@ const SCHEMA_METADATA = (() => {
   return meta;
 })();
 
+const createDefaultState = () => ({
+  searchTerm: '',
+  filters: {},
+  sortBy: 'createdAt',
+  sortOrder: 'desc',
+  dynamicFields: new Set(),
+  groupBy: null, // { field: string, order: 'asc'|'desc' }
+});
+
 export const SearchProvider = ({ children }) => {
-  const [searchState, setSearchState] = useState({
-    searchTerm: '',
-    filters: {},
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
-    dynamicFields: new Set() // Track fields discovered from actual data
-  });
+  // Store search state per page key; 'default' holds global fallback
+  const [searchStates, setSearchStates] = useState({ default: createDefaultState() });
+
+  const ensureKey = (pageKey) => (pageKey || 'default');
+  const getSearchState = useCallback((pageKey = 'default') => {
+    return searchStates[ensureKey(pageKey)] || createDefaultState();
+  }, [searchStates]);
 
   // Update dynamic fields based on property data (memoized to prevent excessive updates)
-  const updateDynamicFields = useCallback((properties) => {
+  const updateDynamicFields = useCallback((properties, pageKey = 'default') => {
     if (!properties || properties.length === 0) return;
 
     const newFields = new Set();
@@ -73,19 +82,13 @@ export const SearchProvider = ({ children }) => {
       });
     });
 
-    // Only update if fields have actually changed
-    setSearchState(prev => {
-      const currentFields = Array.from(prev.dynamicFields).sort().join(',');
+    setSearchStates(prev => {
+      const key = ensureKey(pageKey);
+      const prevState = prev[key] || createDefaultState();
+      const currentFields = Array.from(prevState.dynamicFields).sort().join(',');
       const newFieldsArray = Array.from(newFields).sort().join(',');
-      
-      if (currentFields === newFieldsArray) {
-        return prev; // No change, don't trigger re-render
-      }
-      
-      return {
-        ...prev,
-        dynamicFields: newFields
-      };
+      if (currentFields === newFieldsArray) return prev;
+      return { ...prev, [key]: { ...prevState, dynamicFields: newFields } };
     });
   }, []);
 
@@ -121,63 +124,86 @@ export const SearchProvider = ({ children }) => {
   }, []);
 
   // Set search term (optimized to prevent unnecessary re-renders)
-  const setSearchTerm = useCallback((term) => {
-    setSearchState(prev => prev.searchTerm === term ? prev : ({ ...prev, searchTerm: term }));
+  const setSearchTerm = useCallback((term, pageKey = 'default') => {
+    setSearchStates(prev => {
+      const key = ensureKey(pageKey);
+      const prevState = prev[key] || createDefaultState();
+      if (prevState.searchTerm === term) return prev;
+      return { ...prev, [key]: { ...prevState, searchTerm: term } };
+    });
   }, []);
 
   // Set filter for a specific field (optimized to prevent unnecessary re-renders)
-  const setFilter = useCallback((field, value) => {
-    setSearchState(prev => {
-      if (prev.filters[field] === value) return prev; // No change
+  const setFilter = useCallback((field, value, pageKey = 'default') => {
+    setSearchStates(prev => {
+      const key = ensureKey(pageKey);
+      const prevState = prev[key] || createDefaultState();
+      if (prevState.filters[field] === value) return prev; // No change
       return {
         ...prev,
-        filters: {
-          ...prev.filters,
-          [field]: value
+        [key]: {
+          ...prevState,
+          filters: {
+            ...prevState.filters,
+            [field]: value
+          }
         }
       };
     });
   }, []);
 
   // Clear specific filter
-  const clearFilter = useCallback((field) => {
-    setSearchState(prev => {
-      const newFilters = { ...prev.filters };
+  const clearFilter = useCallback((field, pageKey = 'default') => {
+    setSearchStates(prev => {
+      const key = ensureKey(pageKey);
+      const prevState = prev[key] || createDefaultState();
+      const newFilters = { ...prevState.filters };
       delete newFilters[field];
-      return {
-        ...prev,
-        filters: newFilters
-      };
+      return { ...prev, [key]: { ...prevState, filters: newFilters } };
     });
   }, []);
 
   // Clear all filters
-  const clearAllFilters = useCallback(() => {
-    setSearchState(prev => ({
-      ...prev,
-      searchTerm: '',
-      filters: {}
-    }));
+  const clearAllFilters = useCallback((pageKey = 'default') => {
+    setSearchStates(prev => {
+      const key = ensureKey(pageKey);
+      const prevState = prev[key] || createDefaultState();
+      return { ...prev, [key]: { ...prevState, searchTerm: '', filters: {} } };
+    });
   }, []);
 
   // Set sorting
-  const setSort = useCallback((field, order = 'asc') => {
-    setSearchState(prev => ({
-      ...prev,
-      sortBy: field,
-      sortOrder: order
-    }));
+  const setSort = useCallback((field, order = 'asc', pageKey = 'default') => {
+    setSearchStates(prev => {
+      const key = ensureKey(pageKey);
+      const prevState = prev[key] || createDefaultState();
+      return { ...prev, [key]: { ...prevState, sortBy: field, sortOrder: order } };
+    });
   }, []);
 
+  // Grouping controls
+  const setGroupBy = useCallback((groupConfig, pageKey = 'default') => {
+    // groupConfig: null to clear, or { field, order }
+    setSearchStates(prev => {
+      const key = ensureKey(pageKey);
+      const prevState = prev[key] || createDefaultState();
+      return { ...prev, [key]: { ...prevState, groupBy: groupConfig || null } };
+    });
+  }, []);
+  const clearGroupBy = useCallback((pageKey = 'default') => {
+    setGroupBy(null, pageKey);
+  }, [setGroupBy]);
+
   // Filter properties based on search state
-  const filterProperties = useCallback((properties) => {
+  const filterProperties = useCallback((properties, pageKey = 'default') => {
     if (!properties) return [];
+    const state = getSearchState(pageKey);
 
     let filtered = [...properties];
 
     // Apply text search
-    if (searchState.searchTerm) {
-      const searchLower = searchState.searchTerm.toLowerCase();
+    if (state.searchTerm) {
+      const searchLower = state.searchTerm.toLowerCase();
       filtered = filtered.filter(property => {
         // Search in all text fields
         return SCHEMA_METADATA.text.some(field => {
@@ -188,7 +214,7 @@ export const SearchProvider = ({ children }) => {
     }
 
     // Apply field filters
-    Object.entries(searchState.filters).forEach(([field, filterValue]) => {
+    Object.entries(state.filters).forEach(([field, filterValue]) => {
       if (filterValue === undefined || filterValue === null || filterValue === '') return;
 
     // Special synthetic filters
@@ -262,8 +288,8 @@ export const SearchProvider = ({ children }) => {
     });
 
     // Apply sorting
-    if (searchState.sortBy) {
-      const sortField = searchState.sortBy;
+    if (state.sortBy) {
+      const sortField = state.sortBy;
       const sortType = getFieldType(sortField, filtered[0]?.[sortField]);
       filtered.sort((a, b) => {
         const aValue = a[sortField];
@@ -300,21 +326,22 @@ export const SearchProvider = ({ children }) => {
           comparison = String(aValue).localeCompare(String(bValue));
         }
 
-        return searchState.sortOrder === 'desc' ? -comparison : comparison;
+        return state.sortOrder === 'desc' ? -comparison : comparison;
       });
     }
 
     return filtered;
-  }, [searchState.searchTerm, searchState.filters, searchState.sortBy, searchState.sortOrder, updateDynamicFields, getFieldType]);
+  }, [getSearchState, updateDynamicFields, getFieldType]);
 
   // Get all available fields from dynamic fields and metadata
-  const availableFields = useMemo(() => {
+  const getAvailableFields = useCallback((pageKey = 'default') => {
+    const state = getSearchState(pageKey);
     const schemaFields = PROPERTY_FIELDS.map((f) => f.name);
     const enumFields = Object.keys(SCHEMA_METADATA.enum);
     const allFields = new Set([
       ...schemaFields,
       ...enumFields,
-      ...searchState.dynamicFields
+      ...(state.dynamicFields || new Set())
     ]);
 
     return Array.from(allFields).map(field => ({
@@ -323,17 +350,22 @@ export const SearchProvider = ({ children }) => {
       label: (PROPERTY_FIELDS_MAP[field]?.label) || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
       options: (PROPERTY_FIELDS_MAP[field]?.options) || SCHEMA_METADATA.enum[field] || null
     }));
-  }, [searchState.dynamicFields, getFieldType]);
+  }, [getSearchState, getFieldType]);
 
   const value = {
-    searchState,
+    // Backward-compatible default state (global)
+    searchState: getSearchState('default'),
+    // Per-page accessors
+    getSearchState,
     setSearchTerm,
     setFilter,
     clearFilter,
     clearAllFilters,
     setSort,
+    setGroupBy,
+    clearGroupBy,
     filterProperties,
-    availableFields,
+    getAvailableFields,
     getFieldType,
     updateDynamicFields
   };

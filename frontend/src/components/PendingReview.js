@@ -56,7 +56,7 @@ function PendingReview() {
   useEffect(() => {
     // Update dynamic fields after pendingProperties changes (safe post-render)
     if (pendingProperties && pendingProperties.length > 0) {
-      updateDynamicFields(pendingProperties);
+      updateDynamicFields(pendingProperties, 'pending-review');
     }
   }, [pendingProperties, updateDynamicFields]);
 
@@ -73,7 +73,7 @@ function PendingReview() {
   };
 
   const getVisiblePending = () => {
-    const filtered = filterProperties(pendingProperties);
+    const filtered = filterProperties(pendingProperties, 'pending-review');
     return filtered.filter((p) => {
       const isRegular = !p.archived && !p.deleted;
       if (!showRegular && isRegular) return false;
@@ -208,6 +208,7 @@ function PendingReview() {
           // Refresh the list
           fetchPendingProperties();
         }}
+        pageKey="pending-review"
         customActions={(property) => (
           <Box display="flex" gap={1} flexWrap="wrap" width="100%">
             <Button

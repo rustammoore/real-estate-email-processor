@@ -34,7 +34,7 @@ function PropertyList() {
   useEffect(() => {
     const combined = showDeleted ? [...properties, ...deletedProperties] : properties;
     if (combined && combined.length > 0) {
-      updateDynamicFields(combined);
+      updateDynamicFields(combined, 'properties');
     }
   }, [properties, deletedProperties, showDeleted, updateDynamicFields]);
 
@@ -105,7 +105,7 @@ function PropertyList() {
   }
 
   const combinedList = showDeleted ? [...properties, ...deletedProperties] : properties;
-  const filteredCombined = filterProperties(combinedList);
+  const filteredCombined = filterProperties(combinedList, 'properties');
   const visible = filteredCombined.filter((p) => {
     const isRegular = !p.archived && !p.deleted;
     if (!showRegular && isRegular) return false;
@@ -181,6 +181,7 @@ function PropertyList() {
         showFollowUpBadge={true}
         variant="outlined"
         compact={true}
+        pageKey="properties"
       />
 
       <ConfirmationDialog

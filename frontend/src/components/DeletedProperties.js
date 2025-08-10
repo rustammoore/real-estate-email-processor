@@ -50,7 +50,7 @@ function DeletedProperties() {
 
   useEffect(() => {
     if (deletedProperties && deletedProperties.length > 0) {
-      updateDynamicFields(deletedProperties);
+      updateDynamicFields(deletedProperties, 'deleted');
     }
   }, [deletedProperties, updateDynamicFields]);
 
@@ -67,7 +67,7 @@ function DeletedProperties() {
     }
   };
 
-  const filteredDeleted = useMemo(() => filterProperties(deletedProperties), [deletedProperties, filterProperties]);
+  const filteredDeleted = useMemo(() => filterProperties(deletedProperties, 'deleted'), [deletedProperties, filterProperties]);
 
   const toggleSelectionMode = () => {
     setSelectionMode((prev) => {
@@ -303,6 +303,7 @@ function DeletedProperties() {
         selectMode={selectionMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelectOne}
+        pageKey="deleted"
         onFollowUpSet={(propertyId, days) => {
           // Follow-up set - refresh the list
           fetchDeletedProperties();

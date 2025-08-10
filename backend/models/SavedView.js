@@ -42,6 +42,10 @@ const savedViewSchema = new mongoose.Schema(
       enum: ['asc', 'desc'],
       default: 'desc',
     },
+    groupBy: {
+      type: mongoose.Schema.Types.Mixed, // { field: String, order: 'asc'|'desc' }
+      default: null,
+    },
     isDefault: {
       type: Boolean,
       default: false,

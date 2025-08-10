@@ -24,7 +24,8 @@ function Dashboard() {
   const [allProperties, setAllProperties] = useState([]);
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
-  const { filterProperties, searchState, updateDynamicFields } = useSearch();
+  const { filterProperties, getSearchState, updateDynamicFields } = useSearch();
+  const searchState = getSearchState('dashboard');
   const { counts } = useCounts();
   const { showSuccess, showError } = useToast();
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -89,7 +90,7 @@ function Dashboard() {
   useEffect(() => {
     // Keep dynamic fields updated from latest full property set
     if (allProperties && allProperties.length > 0) {
-      updateDynamicFields(allProperties);
+      updateDynamicFields(allProperties, 'dashboard');
     }
   }, [allProperties, updateDynamicFields]);
 
@@ -272,7 +273,7 @@ function Dashboard() {
         <PropertyGrid 
           properties={
             searchState.searchTerm || Object.keys(searchState.filters).length > 0
-              ? filterProperties(allProperties).slice(0, 10) // Show max 10 results on dashboard
+              ? filterProperties(allProperties, 'dashboard').slice(0, 10) // Show max 10 results on dashboard
               : stats.recentProperties
           }
           emptyMessage={
@@ -284,6 +285,7 @@ function Dashboard() {
           variant="outlined"
           onDelete={handleDelete}
           showFollowUpBadge={true}
+          pageKey="dashboard"
           onFollowUpSet={(propertyId, days) => {
             // Update the property in both lists and re-sort recent list
             const existing = allProperties.find(p => p.id === propertyId);
@@ -355,11 +357,11 @@ function Dashboard() {
         />
         
         {/* Show more results message */}
-        {(searchState.searchTerm || Object.keys(searchState.filters).length > 0) && 
-          filterProperties(allProperties).length > 10 && (
+          {(searchState.searchTerm || Object.keys(searchState.filters).length > 0) && 
+          filterProperties(allProperties, 'dashboard').length > 10 && (
             <div className="text-center mt-4">
               <p className="text-sm text-gray-500 mb-2">
-                Showing 10 of {filterProperties(allProperties).length} results
+                Showing 10 of {filterProperties(allProperties, 'dashboard').length} results
               </p>
               <button 
                 onClick={() => navigate('/properties')}

@@ -44,7 +44,7 @@ router.get('/all', protect, async (req, res) => {
 // Create new view (private by default)
 router.post('/', protect, async (req, res) => {
   try {
-    const { pageKey, name, description, searchTerm, filters, sortBy, sortOrder } = req.body || {};
+    const { pageKey, name, description, searchTerm, filters, sortBy, sortOrder, groupBy } = req.body || {};
     if (!pageKey || !name) {
       return res.status(400).json({ error: 'pageKey and name are required' });
     }
@@ -58,6 +58,7 @@ router.post('/', protect, async (req, res) => {
       filters: filters || {},
       sortBy: sortBy || 'createdAt',
       sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
+      groupBy: groupBy || null,
     });
 
     res.status(201).json(view);
@@ -74,7 +75,7 @@ router.post('/', protect, async (req, res) => {
 router.put('/:id', protect, async (req, res) => {
   try {
     const { id } = req.params;
-    const allowed = ['name', 'description', 'searchTerm', 'filters', 'sortBy', 'sortOrder'];
+    const allowed = ['name', 'description', 'searchTerm', 'filters', 'sortBy', 'sortOrder', 'groupBy'];
     const update = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key];

@@ -74,7 +74,7 @@ const FollowUps = () => {
     setCounts({ due: due.length, notDue: upcoming.length, total: selected.length });
 
     if (selected.length > 0) {
-      updateDynamicFields(selected);
+      updateDynamicFields(selected, 'follow-ups');
     }
 
     // Persist counts and filters for global consumers (e.g., header badge)
@@ -104,8 +104,8 @@ const FollowUps = () => {
   if (loading && allFollowUps.length === 0) return <LoadingSpinner />;
   if (error) return <div className="error-message">{error}</div>;
 
-  const filteredDue = filterProperties(followUpsDue);
-  const filteredNotDue = filterProperties(followUpsNotDue);
+  const filteredDue = filterProperties(followUpsDue, 'follow-ups');
+  const filteredNotDue = filterProperties(followUpsNotDue, 'follow-ups');
 
   return (
     <div className="follow-ups-container">
@@ -166,6 +166,7 @@ const FollowUps = () => {
             onFollowUpRemoved={handleFollowUpRemoved}
             onUpdate={handlePropertyUpdate}
             variant="outlined"
+            pageKey="follow-ups"
           />
         )}
       </div>
@@ -187,6 +188,7 @@ const FollowUps = () => {
             onFollowUpRemoved={handleFollowUpRemoved}
             onUpdate={handlePropertyUpdate}
             variant="outlined"
+            pageKey="follow-ups"
           />
         )}
       </div>
