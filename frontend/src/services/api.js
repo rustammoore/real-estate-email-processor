@@ -372,7 +372,7 @@ const apiService = {
 export const listViews = async (pageKey) => {
   const response = await client.get(`/views`, { params: { pageKey } });
   const items = Array.isArray(response.data?.items) ? response.data.items : (Array.isArray(response.data) ? response.data : []);
-  return items;
+  return items.map(v => ({ ...v, id: String(v.id || v._id) }));
 };
 
 export const createView = async (payload) => {
