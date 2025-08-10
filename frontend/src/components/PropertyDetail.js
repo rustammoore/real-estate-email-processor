@@ -351,17 +351,35 @@ function PropertyDetail() {
                       );
                     }
                     return (
-                       <Grid item xs={12} sm={field.ui?.grid?.sm || (field.name === 'description' ? 12 : 6)} key={field.name}>
+                         <Grid item xs={12} sm={field.ui?.grid?.sm || (field.name === 'description' ? 12 : 6)} key={field.name}>
                         <TextField
                           fullWidth
                           label={field.label}
                           value={value || ''}
-                          onChange={(e) => handleInputChange(field.name, e.target.value)}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (field.name === 'state') {
+                              const normalized = raw.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+                              handleInputChange('state', normalized);
+                            } else {
+                              handleInputChange(field.name, raw);
+                            }
+                          }}
                            disabled={!editing || field.name === 'price_per_ft'}
                           margin="dense"
                           multiline={Boolean(field.ui?.multiline) || field.name === 'description'}
                           rows={field.ui?.rows || (field.name === 'description' ? 4 : undefined)}
                           size="small"
+                          inputProps={field.name === 'state' ? { maxLength: 2, style: { textTransform: 'uppercase' } } : undefined}
+                          onBlur={(e) => {
+                            if (field.name === 'state') {
+                              const raw = e.target.value || '';
+                              const normalized = raw.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+                              if (normalized !== raw) {
+                                handleInputChange('state', normalized);
+                              }
+                            }
+                          }}
                         />
                       </Grid>
                     );

@@ -201,7 +201,7 @@ function PropertyCard({
             <p className="text-xs text-gray-700">
               {[
                 property.square_feet ? `📐 ${property.square_feet} ft²` : null,
-                pricePerFt ? `💵 $${Math.round(pricePerFt).toLocaleString()}/ft²` : null,
+                pricePerFt !== null && pricePerFt !== undefined ? `💵 $${Number(pricePerFt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/ft²` : null,
               ].filter(Boolean).join(' | ')}
             </p>
           )}

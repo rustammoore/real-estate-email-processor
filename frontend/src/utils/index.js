@@ -101,7 +101,8 @@ export const computePricePerFt = (price, squareFeet) => {
   if (!Number.isFinite(priceNum) || !Number.isFinite(sqftNum) || sqftNum <= 0) {
     return null;
   }
-  return priceNum / sqftNum;
+  const raw = priceNum / sqftNum;
+  return Number.isFinite(raw) ? Number(raw.toFixed(2)) : null;
 };
 
 // Validation utilities

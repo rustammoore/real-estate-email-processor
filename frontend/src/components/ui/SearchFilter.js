@@ -29,7 +29,7 @@ import {
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useSearch } from '../../contexts/SearchContext';
-import { debounce } from '../../utils';
+import { debounce, parseNumericValue } from '../../utils';
 import { PROPERTY_FIELDS } from '../../constants/propertySchema';
 
 function SearchFilter({ properties = [], variant = 'default', showAdvanced = true }) {
@@ -51,6 +51,9 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   const [pendingSortBy, setPendingSortBy] = useState(searchState.sortBy);
   const [pendingSortOrder, setPendingSortOrder] = useState(searchState.sortOrder);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  // Local drafts for numeric inputs to avoid aggressive re-formatting while typing
+  const [inputDrafts, setInputDrafts] = useState({}); // key: `${fieldName}-min|max` -> string
+  const [focusedInputs, setFocusedInputs] = useState({}); // key -> boolean
 
   // Update dynamic fields when properties change
   useEffect(() => {
@@ -67,6 +70,52 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     }, 300),
     [setSearchTerm]
   );
+
+  const formatCurrency = React.useCallback((value, maxFractionDigits = 2) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return String(value ?? '');
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: maxFractionDigits
+      }).format(num);
+    } catch (e) {
+      return String(value ?? '');
+    }
+  }, []);
+
+  const isCurrencyField = (fieldName) => fieldName === 'price' || fieldName === 'price_per_ft';
+
+  const getMaxFractionDigits = (fieldName) => {
+    if (isCurrencyField(fieldName)) return 2;
+    if (fieldName === 'cap_rate') return 2;
+    if (fieldName === 'square_feet') return 0;
+    return 2;
+  };
+
+  const formatNumberForInput = React.useCallback((value, fieldName) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    const maximumFractionDigits = getMaxFractionDigits(fieldName);
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'decimal',
+        minimumFractionDigits: 0,
+        maximumFractionDigits
+      }).format(num);
+    } catch (e) {
+      return String(num);
+    }
+  }, []);
+
+  const setFocus = (key, focused) => {
+    setFocusedInputs(prev => ({ ...prev, [key]: focused }));
+  };
+  const setDraft = (key, value) => {
+    setInputDrafts(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -149,7 +198,25 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             key={field.name}
             label={field.label}
             value={currentValue}
-            onChange={(e) => handleFilterChange(field.name, e.target.value)}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (field.name === 'state') {
+                const normalized = raw.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+                handleFilterChange(field.name, normalized);
+              } else {
+                handleFilterChange(field.name, raw);
+              }
+            }}
+            onBlur={(e) => {
+              if (field.name === 'state') {
+                const raw = e.target.value || '';
+                const normalized = raw.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+                if (normalized !== raw) {
+                  handleFilterChange(field.name, normalized);
+                }
+              }
+            }}
+            inputProps={field.name === 'state' ? { maxLength: 2, style: { textTransform: 'uppercase' } } : undefined}
             variant="outlined"
             size="small"
             fullWidth
@@ -207,33 +274,143 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
           computedMax = computedMin + 1;
         }
 
+        // Default numeric inputs to empty values instead of auto-filling dynamic bounds
         const initialRange = (currentValue && typeof currentValue === 'object')
           ? currentValue
-          : { min: computedMin, max: computedMax };
+          : { min: undefined, max: undefined };
 
         const clampedMin = Math.max(computedMin, Number(initialRange.min ?? computedMin));
         const clampedMax = Math.min(computedMax, Number(initialRange.max ?? computedMax));
 
+        const minKey = `${field.name}-min`;
+        const maxKey = `${field.name}-max`;
+
+        const handleMinInputChange = (e) => {
+          const parsed = parseNumericValue(e.target.value);
+          let adjusted = parsed;
+          if (field.name === 'cap_rate' && adjusted !== null && !Number.isNaN(adjusted) && adjusted <= 1) {
+            adjusted = adjusted * 100; // treat decimals as percent
+          }
+          // Do not clamp to computed bounds; allow any user-entered number
+          let newMin = adjusted === null || Number.isNaN(adjusted) ? undefined : adjusted;
+          let newMax = initialRange.max;
+          if (Number.isFinite(newMin) && Number.isFinite(newMax) && newMin > newMax) {
+            newMax = newMin;
+          }
+          setDraft(minKey, e.target.value);
+          if ((newMin === undefined || newMin === null) && (newMax === undefined || newMax === null)) {
+            handleFilterChange(field.name, '');
+          } else {
+            handleFilterChange(field.name, { min: newMin, max: newMax });
+          }
+        };
+
+        const handleMaxInputChange = (e) => {
+          const parsed = parseNumericValue(e.target.value);
+          let adjusted = parsed;
+          if (field.name === 'cap_rate' && adjusted !== null && !Number.isNaN(adjusted) && adjusted <= 1) {
+            adjusted = adjusted * 100; // treat decimals as percent
+          }
+          // Do not clamp to computed bounds; allow any user-entered number
+          let newMax = adjusted === null || Number.isNaN(adjusted) ? undefined : adjusted;
+          let newMin = initialRange.min;
+          if (Number.isFinite(newMin) && Number.isFinite(newMax) && newMax < newMin) {
+            newMin = newMax;
+          }
+          setDraft(maxKey, e.target.value);
+          if ((newMin === undefined || newMin === null) && (newMax === undefined || newMax === null)) {
+            handleFilterChange(field.name, '');
+          } else {
+            handleFilterChange(field.name, { min: newMin, max: newMax });
+          }
+        };
+
         return (
           <Box key={field.name}>
             <Typography gutterBottom variant="caption">{field.label}{field.name === 'cap_rate' ? ' (%)' : ''}</Typography>
-            <Box sx={{ px: 0.5 }}>
+            <Box sx={{ px: 2, display: 'flex', justifyContent: 'center' }}>
               <Slider
+                sx={{ width: '88%' }}
                 size="small"
                 value={[clampedMin, clampedMax]}
                 onChange={(e, newValue) => {
                   const [newMin, newMax] = Array.isArray(newValue) ? newValue : [computedMin, computedMax];
+                  // Clear drafts so inputs reflect slider values cleanly
+                  setDraft(minKey, undefined);
+                  setDraft(maxKey, undefined);
                   handleFilterChange(field.name, { min: newMin, max: newMax });
                 }}
                 valueLabelDisplay="auto"
+                valueLabelFormat={(val) => {
+                  if (field.name === 'cap_rate') return `${val}%`;
+                  if (isCurrencyField(field.name)) return formatCurrency(val, 2);
+                  return formatNumberForInput(val, field.name);
+                }}
                 min={computedMin}
                 max={computedMax}
+                step={field.name === 'cap_rate' ? 0.01 : (isCurrencyField(field.name) ? 0.01 : 1)}
                 disableSwap
               />
             </Box>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="caption">{field.name === 'cap_rate' ? `${clampedMin}%` : clampedMin}</Typography>
-              <Typography variant="caption">{field.name === 'cap_rate' ? `${clampedMax}%` : clampedMax}</Typography>
+            <Box display="flex" gap={1} mt={0.5}>
+              <TextField
+                size="small"
+                type="text"
+                label="Min"
+                value={
+                  focusedInputs[minKey]
+                    ? (inputDrafts[minKey] ?? '')
+                    : (initialRange.min === undefined || initialRange.min === null ? '' : formatNumberForInput(initialRange.min, field.name))
+                }
+                onChange={handleMinInputChange}
+                inputProps={{ inputMode: 'decimal' }}
+                fullWidth
+                onFocus={() => {
+                  setFocus(minKey, true);
+                  setDraft(minKey, initialRange.min === undefined || initialRange.min === null ? '' : String(initialRange.min));
+                }}
+                onBlur={() => {
+                  setFocus(minKey, false);
+                  const num = parseNumericValue(inputDrafts[minKey]);
+                  setDraft(minKey, (num === null || Number.isNaN(num)) ? '' : formatNumberForInput(num, field.name));
+                }}
+                InputProps={
+                  isCurrencyField(field.name)
+                    ? { startAdornment: <InputAdornment position="start">$</InputAdornment> }
+                    : field.name === 'cap_rate'
+                      ? { endAdornment: <InputAdornment position="end">%</InputAdornment> }
+                      : undefined
+                }
+              />
+              <TextField
+                size="small"
+                type="text"
+                label="Max"
+                value={
+                  focusedInputs[maxKey]
+                    ? (inputDrafts[maxKey] ?? '')
+                    : (initialRange.max === undefined || initialRange.max === null ? '' : formatNumberForInput(initialRange.max, field.name))
+                }
+                onChange={handleMaxInputChange}
+                inputProps={{ inputMode: 'decimal' }}
+                fullWidth
+                onFocus={() => {
+                  setFocus(maxKey, true);
+                  setDraft(maxKey, initialRange.max === undefined || initialRange.max === null ? '' : String(initialRange.max));
+                }}
+                onBlur={() => {
+                  setFocus(maxKey, false);
+                  const num = parseNumericValue(inputDrafts[maxKey]);
+                  setDraft(maxKey, (num === null || Number.isNaN(num)) ? '' : formatNumberForInput(num, field.name));
+                }}
+                InputProps={
+                  isCurrencyField(field.name)
+                    ? { startAdornment: <InputAdornment position="start">$</InputAdornment> }
+                    : field.name === 'cap_rate'
+                      ? { endAdornment: <InputAdornment position="end">%</InputAdornment> }
+                      : undefined
+                }
+              />
             </Box>
           </Box>
         );
@@ -491,7 +668,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             
             if (typeof value === 'object' && value !== null) {
               if (value.min !== undefined || value.max !== undefined) {
-                displayValue = `${value.min || 'Any'} - ${value.max || 'Any'}`;
+                const formatRange = (v) => {
+                  if (v === undefined || v === null || v === '') return 'Any';
+                  if (fieldName === 'cap_rate') return `${v}%`;
+                  if (fieldName === 'price' || fieldName === 'price_per_ft') return formatCurrency(v, 2);
+                  return v;
+                };
+                displayValue = `${formatRange(value.min)} - ${formatRange(value.max)}`;
               } else if (value.from || value.to) {
                 displayValue = `${value.from ? new Date(value.from).toLocaleDateString() : 'Any'} - ${value.to ? new Date(value.to).toLocaleDateString() : 'Any'}`;
               }
@@ -627,13 +810,15 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             )}
 
             {/* Grouped Filters */}
-            {Object.entries(groupedFields).map(([groupName, fields]) => (
+            {Object.entries(groupedFields)
+              .filter(([groupName, fields]) => groupName !== 'Other' && (!Array.isArray(fields) || fields.length > 0))
+              .map(([groupName, fields]) => (
               <Grid item xs={12} key={groupName}>
-                <Accordion defaultExpanded={groupName === 'Status Fields' || groupName === 'Boolean Fields'} sx={{ '& .MuiAccordionSummary-root': { minHeight: 32 }, '& .MuiAccordionSummary-content': { my: 0 } }}>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="caption">{groupName}</Typography>
-                  </AccordionSummary>
-                  <AccordionDetails sx={{ pt: 0.5 }}>
+                 <Accordion defaultExpanded={groupName === 'Status Fields' || groupName === 'Boolean Fields'} sx={{ '& .MuiAccordionSummary-root': { minHeight: 32 }, '& .MuiAccordionSummary-content': { my: 0 } }}>
+                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                     <Typography variant="caption">{groupName === 'Text Fields' ? 'Main' : groupName}</Typography>
+                   </AccordionSummary>
+                   <AccordionDetails sx={{ pt: groupName === 'Text Fields' ? 0.25 : 0.5 }}>
                     {groupName === 'Text Fields' ? (
                       <>
                         {(() => {
@@ -643,16 +828,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                           return (
                             <>
                               {primaryFields.length > 0 && (
-                                <>
-                                  <Typography variant="overline" sx={{ display: 'block', mb: 0.5 }}>General</Typography>
-                                  <Grid container spacing={1} sx={{ mb: metaFields.length > 0 ? 1 : 0 }}>
-                                    {primaryFields.map((field) => (
-                                      <Grid item xs={12} sm={6} md={4} key={field.name}>
-                                        {renderFilterControl(field)}
-                                      </Grid>
-                                    ))}
-                                  </Grid>
-                                </>
+                                <Grid container spacing={1} sx={{ mb: metaFields.length > 0 ? 1 : 0 }}>
+                                  {primaryFields.map((field) => (
+                                    <Grid item xs={12} sm={6} md={4} key={field.name}>
+                                      {renderFilterControl(field)}
+                                    </Grid>
+                                  ))}
+                                </Grid>
                               )}
                               {metaFields.length > 0 && (
                                 <>

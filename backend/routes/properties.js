@@ -174,7 +174,8 @@ router.get('/', optionalAuth, async (req, res) => {
       const priceNum = normalizeNumber(rest.price);
       const sqftNum = normalizeNumber(rest.square_feet);
       if (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0) {
-        price_per_ft = priceNum / sqftNum;
+        const raw = priceNum / sqftNum;
+        price_per_ft = Number.isFinite(raw) ? Number(raw.toFixed(2)) : null;
       }
       return { id, ...rest, price_per_ft };
     });
@@ -212,7 +213,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const priceNum = parseFloat(data.price);
     let price_per_ft = null;
     if (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0) {
-      price_per_ft = priceNum / sqftNum;
+      const raw = priceNum / sqftNum;
+      price_per_ft = Number.isFinite(raw) ? Number(raw.toFixed(2)) : null;
     }
     res.json({ ...data, price_per_ft });
   } catch (error) {
