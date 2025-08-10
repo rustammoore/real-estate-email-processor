@@ -124,6 +124,16 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   };
 
   const handleApplyView = (id) => {
+    if (!id) {
+      // Apply None: clear search and filters, keep current sort settings
+      setLocalSearchTerm('');
+      setSearchTerm('');
+      setPendingFilters({});
+      Object.keys(searchState.filters || {}).forEach((field) => clearFilter(field));
+      setHasPendingChanges(false);
+      setSelectedViewId('');
+      return;
+    }
     const view = views.find(v => String(v.id) === String(id));
     if (view) {
       applyViewState(view);
@@ -765,14 +775,6 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               onChange={(e) => {
                 const value = e.target.value;
                 setSelectedViewId(value);
-                if (!value) {
-                  // Selecting None clears search and filters immediately
-                  setLocalSearchTerm('');
-                  setPendingFilters({});
-                  setHasPendingChanges(false);
-                  setSearchTerm('');
-                  clearAllFilters();
-                }
               }}
               disabled={isLoadingViews}
             >
@@ -798,8 +800,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
           <Button
             variant="contained"
             size="small"
-            disabled={!selectedViewId}
-            onClick={() => selectedViewId && handleApplyView(selectedViewId)}
+            onClick={() => handleApplyView(selectedViewId)}
           >
             Apply View
           </Button>
