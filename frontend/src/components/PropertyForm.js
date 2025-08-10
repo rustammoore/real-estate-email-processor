@@ -339,7 +339,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                               handleInputChange('price', formatted);
                             } else if (field.name === 'cap_rate') {
                               const raw = e.target.value || '';
-                              // Normalize cap rate input: allow either % or decimal, store as percentage string with '%'
+                              // Normalize cap rate input: allow either % or decimal, store as plain percentage number
                               const hasPercent = raw.includes('%');
                               const cleaned = raw.replace(/[^0-9.\-]/g, '');
                               const n = parseFloat(cleaned);
@@ -347,7 +347,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                                 handleInputChange('cap_rate', '');
                               } else {
                                 const percent = hasPercent ? n : (n <= 1 ? n * 100 : n);
-                                const formatted = `${percent}%`;
+                                const formatted = `${percent}`;
                                 handleInputChange('cap_rate', formatted);
                               }
                             }

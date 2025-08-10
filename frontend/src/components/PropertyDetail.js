@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Card, CardContent, Typography, Button, TextField, Grid, Box, Chip, ImageList, ImageListItem, FormControl, InputLabel, Select, MenuItem, Alert } from '@mui/material';
+import { Card, CardContent, Typography, Button, TextField, Grid, Box, Chip, ImageList, ImageListItem, FormControl, InputLabel, Select, MenuItem, Alert, InputAdornment } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import { EyeIcon, PencilIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import api from '../services/api';
@@ -418,7 +418,7 @@ function PropertyDetail() {
                             <Box sx={{ mb: 1 }} key={field.name}>
                               <TextField
                                 fullWidth
-                                label={field.label}
+                                label={field.name === 'cap_rate' ? `${field.label} (%)` : field.label}
                                 value={formData[field.name] ?? ''}
                                 onChange={(e) => handleInputChange(field.name, e.target.value)}
                                 onBlur={(e) => {
@@ -427,10 +427,23 @@ function PropertyDetail() {
                                     const num = parseFloat(cleaned);
                                     const formatted = Number.isFinite(num) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(num) : '';
                                     handleInputChange('price', formatted);
+                                  } else if (field.name === 'cap_rate') {
+                                    const raw = e.target.value || '';
+                                    const hasPercent = raw.includes('%');
+                                    const cleaned = raw.replace(/[^0-9.\-]/g, '');
+                                    const n = parseFloat(cleaned);
+                                    if (!Number.isFinite(n)) {
+                                      handleInputChange('cap_rate', '');
+                                    } else {
+                                      const percent = hasPercent ? n : (n <= 1 ? n * 100 : n);
+                                      const formatted = `${percent}`;
+                                      handleInputChange('cap_rate', formatted);
+                                    }
                                   }
                                 }}
                                 size="small"
                                 margin="dense"
+                                InputProps={field.name === 'cap_rate' ? { endAdornment: <InputAdornment position="end">%</InputAdornment> } : undefined}
                               />
                             </Box>
                           );
