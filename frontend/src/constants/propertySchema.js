@@ -84,7 +84,7 @@ export const PROPERTY_FIELDS = [
   {
     name: 'cap_rate',
     label: 'CAP Rate',
-    type: 'text',
+    type: 'numeric',
     defaultValue: '',
     section: PROPERTY_SECTIONS.ADDITIONAL,
     showIn: { create: true, edit: true, view: true, search: true },
@@ -158,8 +158,8 @@ export const PROPERTY_FIELDS = [
     placeholder: 'e.g., 1998',
   },
   {
-    name: 'bedrooms',
-    label: 'FieldOne',
+    name: 'CustomFieldOne',
+    label: 'CustomFieldOne',
     type: 'numeric',
     defaultValue: '',
     section: PROPERTY_SECTIONS.DETAILS,
@@ -167,8 +167,8 @@ export const PROPERTY_FIELDS = [
     placeholder: 'e.g., 3 or N/A',
   },
   {
-    name: 'bathrooms',
-    label: 'FieldTwo',
+    name: 'CustomFieldTwo',
+    label: 'CustomFieldTwo',
     type: 'numeric',
     defaultValue: '',
     section: PROPERTY_SECTIONS.DETAILS,

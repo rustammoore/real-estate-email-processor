@@ -3,6 +3,20 @@ import { PROPERTY_FIELDS, PROPERTY_FIELDS_MAP } from '../constants/propertySchem
 
 const SearchContext = createContext();
 
+// Robust numeric extractor for values that may include currency symbols, commas, or units
+// Examples:
+// "$15,000/month" -> 15000
+// "5,000" -> 5000
+// "1.25 acres" -> 1.25
+function extractNumeric(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+  if (typeof value !== 'string') return NaN;
+  const cleaned = value.replace(/[^0-9.\-]/g, '');
+  // Guard against strings like ".." or "-" which parseFloat would return NaN for anyway
+  const num = parseFloat(cleaned);
+  return Number.isFinite(num) ? num : NaN;
+}
+
 // Build metadata map from centralized schema
 const SCHEMA_METADATA = (() => {
   const meta = { text: [], numeric: [], boolean: [], enum: {}, date: [], special: [], images: [] };
@@ -174,6 +188,13 @@ export const SearchProvider = ({ children }) => {
     Object.entries(searchState.filters).forEach(([field, filterValue]) => {
       if (filterValue === undefined || filterValue === null || filterValue === '') return;
 
+    // Special synthetic filters
+    if (field === 'followUp') {
+      // Treat as presence/absence of followUpDate
+      filtered = filtered.filter((property) => Boolean(property.followUpDate) === Boolean(filterValue));
+      return;
+    }
+
       const fieldType = getFieldType(field, filtered[0]?.[field]);
 
       filtered = filtered.filter(property => {
@@ -184,13 +205,34 @@ export const SearchProvider = ({ children }) => {
             return value && String(value).toLowerCase().includes(String(filterValue).toLowerCase());
           
           case 'numeric':
+            // Special handling for CAP Rate: normalize values to percent scale for comparison
+            const normalizeCapRate = (val) => {
+              if (val === undefined || val === null) return NaN;
+              if (typeof val === 'number') {
+                const numeric = Number(val);
+                if (!Number.isFinite(numeric)) return NaN;
+                return numeric <= 1 ? numeric * 100 : numeric;
+              }
+              if (typeof val === 'string') {
+                const hasPercent = val.includes('%');
+                const cleaned = val.replace(/[^0-9.\-]/g, '');
+                const n = parseFloat(cleaned);
+                if (!Number.isFinite(n)) return NaN;
+                return hasPercent ? n : (n <= 1 ? n * 100 : n);
+              }
+              return NaN;
+            };
+
             if (typeof filterValue === 'object' && filterValue !== null) {
-              const numValue = parseFloat(value);
+              const numValue = field === 'cap_rate' ? normalizeCapRate(value) : extractNumeric(value);
               if (filterValue.min !== undefined && numValue < filterValue.min) return false;
               if (filterValue.max !== undefined && numValue > filterValue.max) return false;
               return true;
             }
-            return parseFloat(value) === parseFloat(filterValue);
+            if (field === 'cap_rate') {
+              return normalizeCapRate(value) === normalizeCapRate(filterValue);
+            }
+            return extractNumeric(value) === extractNumeric(filterValue);
           
           case 'boolean':
             return Boolean(value) === Boolean(filterValue);
@@ -218,21 +260,41 @@ export const SearchProvider = ({ children }) => {
 
     // Apply sorting
     if (searchState.sortBy) {
+      const sortField = searchState.sortBy;
+      const sortType = getFieldType(sortField, filtered[0]?.[sortField]);
       filtered.sort((a, b) => {
-        const aValue = a[searchState.sortBy];
-        const bValue = b[searchState.sortBy];
+        const aValue = a[sortField];
+        const bValue = b[sortField];
 
         if (aValue === bValue) return 0;
         if (aValue === null || aValue === undefined) return 1;
         if (bValue === null || bValue === undefined) return -1;
 
         let comparison = 0;
-        if (typeof aValue === 'string') {
-          comparison = aValue.localeCompare(bValue);
-        } else if (typeof aValue === 'number') {
-          comparison = aValue - bValue;
-        } else if (aValue instanceof Date || !isNaN(Date.parse(aValue))) {
+        if (sortType === 'numeric') {
+          if (sortField === 'cap_rate') {
+            const norm = (val) => {
+              if (val === undefined || val === null) return 0;
+              if (typeof val === 'number') return val <= 1 ? val * 100 : val;
+              const hasPercent = typeof val === 'string' && val.includes('%');
+              const cleaned = String(val).replace(/[^0-9.\-]/g, '');
+              const n = parseFloat(cleaned);
+              if (!Number.isFinite(n)) return 0;
+              return hasPercent ? n : (n <= 1 ? n * 100 : n);
+            };
+            comparison = norm(aValue) - norm(bValue);
+          } else {
+            comparison = (extractNumeric(aValue) || 0) - (extractNumeric(bValue) || 0);
+          }
+        } else if (sortType === 'date') {
           comparison = new Date(aValue) - new Date(bValue);
+        } else if (typeof aValue === 'string' && typeof bValue === 'string') {
+          comparison = aValue.localeCompare(bValue);
+        } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+          comparison = aValue - bValue;
+        } else {
+          // Fallback: string compare
+          comparison = String(aValue).localeCompare(String(bValue));
         }
 
         return searchState.sortOrder === 'desc' ? -comparison : comparison;

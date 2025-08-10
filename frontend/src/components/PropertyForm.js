@@ -164,8 +164,8 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
       price_per_ft: '',
       acre: '',
       year_built: '',
-      bedrooms: '',
-      bathrooms: '',
+      CustomFieldOne: '',
+      CustomFieldTwo: '',
       property_url: '',
       for_lease_info: '',
       other: '',
@@ -337,6 +337,19 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                               const num = parseCurrencyToNumber(e.target.value);
                               const formatted = Number.isFinite(num) ? formatCurrencyUSD(num) : '';
                               handleInputChange('price', formatted);
+                            } else if (field.name === 'cap_rate') {
+                              const raw = e.target.value || '';
+                              // Normalize cap rate input: allow either % or decimal, store as percentage string
+                              const hasPercent = raw.includes('%');
+                              const cleaned = raw.replace(/[^0-9.\-]/g, '');
+                              const n = parseFloat(cleaned);
+                              if (!Number.isFinite(n)) {
+                                handleInputChange('cap_rate', '');
+                              } else {
+                                const percent = hasPercent ? n : (n <= 1 ? n * 100 : n);
+                                const formatted = `${percent}`;
+                                handleInputChange('cap_rate', formatted);
+                              }
                             }
                           }}
                           size="small"

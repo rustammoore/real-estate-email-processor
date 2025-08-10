@@ -162,6 +162,25 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
         const numericValues = properties
           .map(p => {
             const raw = p[field.name];
+            // Special handling for CAP Rate: normalize to percent scale
+            if (field.name === 'cap_rate') {
+              if (typeof raw === 'number') {
+                const numeric = Number(raw);
+                if (!Number.isFinite(numeric)) return NaN;
+                // If value is decimal (<= 1), convert to percent
+                return numeric <= 1 ? numeric * 100 : numeric;
+              }
+              if (typeof raw === 'string') {
+                const hasPercent = raw.includes('%');
+                const cleaned = raw.replace(/[^0-9.\-]/g, '');
+                const n = parseFloat(cleaned);
+                if (!Number.isFinite(n)) return NaN;
+                return hasPercent ? n : (n <= 1 ? n * 100 : n);
+              }
+              return NaN;
+            }
+
+            // Generic numeric extraction
             if (typeof raw === 'number') return raw;
             if (typeof raw === 'string') {
               const cleaned = raw.replace(/[^0-9.\-]/g, '');
@@ -197,7 +216,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
 
         return (
           <Box key={field.name}>
-            <Typography gutterBottom variant="caption">{field.label}</Typography>
+            <Typography gutterBottom variant="caption">{field.label}{field.name === 'cap_rate' ? ' (%)' : ''}</Typography>
             <Box sx={{ px: 0.5 }}>
               <Slider
                 size="small"
@@ -213,8 +232,8 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               />
             </Box>
             <Box display="flex" justifyContent="space-between">
-              <Typography variant="caption">{clampedMin}</Typography>
-              <Typography variant="caption">{clampedMax}</Typography>
+              <Typography variant="caption">{field.name === 'cap_rate' ? `${clampedMin}%` : clampedMin}</Typography>
+              <Typography variant="caption">{field.name === 'cap_rate' ? `${clampedMax}%` : clampedMax}</Typography>
             </Box>
           </Box>
         );
