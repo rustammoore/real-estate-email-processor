@@ -162,7 +162,7 @@ function PendingReview() {
       )}
 
       {/* Search Filter */}
-      <SearchFilter properties={pendingProperties} showAdvanced={true} />
+      <SearchFilter properties={pendingProperties} showAdvanced={true} pageKey="pending-review" />
 
       {/* Toggle Row - consistent with Follow-Ups (placed under SearchFilter) */}
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>

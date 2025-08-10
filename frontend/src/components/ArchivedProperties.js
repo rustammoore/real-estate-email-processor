@@ -148,6 +148,7 @@ function ArchivedProperties() {
         <SearchFilter 
           properties={archivedProperties} 
           showAdvanced={true}
+          pageKey="archived"
         />
       </Box>
       <Box mb={2}>

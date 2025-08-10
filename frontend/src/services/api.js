@@ -353,6 +353,7 @@ const apiService = {
   restoreProperty,
   permanentlyDeleteProperty,
   fetchFollowUps,
+  // saved views will be appended below
   // auth helpers for context
   setAuthToken,
   getAuthToken,
@@ -366,5 +367,38 @@ const apiService = {
   updateEmailConfig: updateEmailConfigApi,
   uploadImages,
 };
+
+// Saved Views API
+export const listViews = async (pageKey) => {
+  const response = await client.get(`/views`, { params: { pageKey } });
+  const items = Array.isArray(response.data?.items) ? response.data.items : (Array.isArray(response.data) ? response.data : []);
+  return items;
+};
+
+export const createView = async (payload) => {
+  const response = await client.post(`/views`, payload);
+  return response.data;
+};
+
+export const updateView = async (id, payload) => {
+  const response = await client.put(`/views/${id}`, payload);
+  return response.data;
+};
+
+export const deleteView = async (id) => {
+  const response = await client.delete(`/views/${id}`);
+  return response.data;
+};
+
+export const setDefaultView = async (id) => {
+  const response = await client.post(`/views/${id}/default`);
+  return response.data;
+};
+
+apiService.listViews = listViews;
+apiService.createView = createView;
+apiService.updateView = updateView;
+apiService.deleteView = deleteView;
+apiService.setDefaultView = setDefaultView;
 
 export default apiService; 

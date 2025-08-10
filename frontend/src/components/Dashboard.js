@@ -265,6 +265,7 @@ function Dashboard() {
         <SearchFilter 
           properties={allProperties}
           showAdvanced={true}
+          pageKey="dashboard"
         />
         
         {/* Property Grid */}

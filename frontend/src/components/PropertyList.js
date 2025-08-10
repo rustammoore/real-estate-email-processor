@@ -124,7 +124,7 @@ function PropertyList() {
 
       {/* Centralized Search & Filters */}
       <Box sx={{ mb: 2 }}>
-        <SearchFilter properties={combinedList} showAdvanced={true} />
+        <SearchFilter properties={combinedList} showAdvanced={true} pageKey="properties" />
       </Box>
 
       {/* Toggle Row - consistent with Follow-Ups */}

@@ -9,6 +9,7 @@ const propertyRoutes = require('./routes/properties');
 const authRoutes = require('./routes/auth');
 const errorHandler = require('./middleware/errorHandler');
 const uploadRoutes = require('./routes/uploads');
+const viewsRoutes = require('./routes/views');
 
 dotenv.config();
 
@@ -81,6 +82,7 @@ connectToDatabase();
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/views', viewsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

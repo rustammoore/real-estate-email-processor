@@ -279,7 +279,7 @@ function DeletedProperties() {
       )}
 
       {/* Search Filter */}
-      <SearchFilter properties={deletedProperties} showAdvanced={true} />
+      <SearchFilter properties={deletedProperties} showAdvanced={true} pageKey="deleted" />
 
       {/* Results count */}
       <Box mb={2}>

@@ -29,10 +29,11 @@ import {
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useSearch } from '../../contexts/SearchContext';
+import api from '../../services/api';
 import { debounce, parseNumericValue } from '../../utils';
 import { PROPERTY_FIELDS } from '../../constants/propertySchema';
 
-function SearchFilter({ properties = [], variant = 'default', showAdvanced = true }) {
+function SearchFilter({ properties = [], variant = 'default', showAdvanced = true, pageKey = 'default' }) {
   const {
     searchState,
     setSearchTerm,
@@ -55,6 +56,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   const [inputDrafts, setInputDrafts] = useState({}); // key: `${fieldName}-min|max` -> string
   const [focusedInputs, setFocusedInputs] = useState({}); // key -> boolean
 
+  // Saved Views state
+  const [views, setViews] = useState([]);
+  const [isLoadingViews, setIsLoadingViews] = useState(false);
+  const [selectedViewId, setSelectedViewId] = useState('');
+  const [newViewName, setNewViewName] = useState('');
+  const [newViewVisibility, setNewViewVisibility] = useState('private');
+
   // Update dynamic fields when properties change
   useEffect(() => {
     if (properties.length > 0) {
@@ -70,6 +78,96 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     }, 300),
     [setSearchTerm]
   );
+
+  // Load saved views for this page
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        setIsLoadingViews(true);
+        const data = await api.listViews(pageKey);
+        if (!mounted) return;
+        setViews(Array.isArray(data) ? data : []);
+        // Apply default view if present and no current search/filters
+        const defaultView = (Array.isArray(data) ? data : []).find(v => v.isDefault);
+        const hasLocalState = Boolean(searchState.searchTerm) || Object.keys(searchState.filters || {}).length > 0;
+        if (defaultView && !hasLocalState) {
+          applyViewState(defaultView);
+          setSelectedViewId(defaultView.id);
+        }
+      } catch (_) {
+        // silently ignore
+      } finally {
+        if (mounted) setIsLoadingViews(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageKey]);
+
+  const applyViewState = (view) => {
+    if (!view) return;
+    // Apply search
+    setLocalSearchTerm(view.searchTerm || '');
+    setSearchTerm(view.searchTerm || '');
+    // Apply filters: clear existing then set new
+    Object.keys(searchState.filters || {}).forEach((field) => clearFilter(field));
+    setPendingFilters(view.filters || {});
+    Object.entries(view.filters || {}).forEach(([field, value]) => setFilter(field, value));
+    // Apply sort
+    if (view.sortBy) {
+      setPendingSortBy(view.sortBy);
+      setPendingSortOrder(view.sortOrder || 'desc');
+      setSort(view.sortBy, view.sortOrder || 'desc');
+    }
+    setHasPendingChanges(false);
+  };
+
+  const handleApplyView = (id) => {
+    const view = views.find(v => String(v.id) === String(id));
+    if (view) {
+      applyViewState(view);
+      setSelectedViewId(id);
+    }
+  };
+
+  const handleSaveView = async () => {
+    if (!newViewName.trim()) return;
+    const payload = {
+      pageKey,
+      name: newViewName.trim(),
+      searchTerm: localSearchTerm,
+      filters: pendingFilters,
+      sortBy: pendingSortBy,
+      sortOrder: pendingSortOrder,
+      visibility: newViewVisibility,
+    };
+    try {
+      const created = await api.createView(payload);
+      setViews(prev => [created, ...prev]);
+      setNewViewName('');
+      setNewViewVisibility('private');
+      setSelectedViewId(created.id);
+    } catch (_) {
+      // ignore
+    }
+  };
+
+  const handleDeleteView = async (id) => {
+    try {
+      await api.deleteView(id);
+      setViews(prev => prev.filter(v => String(v.id) !== String(id)));
+      if (String(selectedViewId) === String(id)) setSelectedViewId('');
+    } catch (_) {}
+  };
+
+  const handleSetDefault = async (id) => {
+    try {
+      await api.setDefaultView(id);
+      setViews(prev => prev.map(v => ({ ...v, isDefault: String(v.id) === String(id) })));
+    } catch (_) {}
+  };
 
   const formatCurrency = React.useCallback((value, maxFractionDigits = 2) => {
     const num = Number(value);
@@ -657,6 +755,58 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
           </Button>
         )}
       </Box>
+
+      {/* Saved Views Controls */}
+      {showAdvanced && (
+        <Box display="flex" gap={1} mb={2} flexWrap="wrap" alignItems="center">
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel id="saved-views-label">Saved Views</InputLabel>
+            <Select
+              labelId="saved-views-label"
+              label="Saved Views"
+              value={selectedViewId}
+              onChange={(e) => handleApplyView(e.target.value)}
+              disabled={isLoadingViews}
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {views.map((v) => (
+                <MenuItem key={v.id} value={v.id}>
+                  {v.name}{v.visibility === 'public' ? ' (public)' : ''}{v.isDefault ? ' • default' : ''}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            size="small"
+            placeholder="New view name"
+            value={newViewName}
+            onChange={(e) => setNewViewName(e.target.value)}
+          />
+          <FormControl size="small">
+            <InputLabel id="view-visibility-label">Visibility</InputLabel>
+            <Select
+              labelId="view-visibility-label"
+              label="Visibility"
+              value={newViewVisibility}
+              onChange={(e) => setNewViewVisibility(e.target.value)}
+            >
+              <MenuItem value="private">Private</MenuItem>
+              <MenuItem value="public">Public</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="outlined" size="small" onClick={handleSaveView}>
+            Save View
+          </Button>
+          {selectedViewId && (
+            <>
+              <Button variant="text" size="small" onClick={() => handleSetDefault(selectedViewId)}>Set Default</Button>
+              <Button color="error" variant="text" size="small" onClick={() => handleDeleteView(selectedViewId)}>Delete</Button>
+            </>
+          )}
+        </Box>
+      )}
 
       {/* Active Filters Display */}
       {activeFiltersCount > 0 && (

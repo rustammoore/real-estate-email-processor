@@ -131,7 +131,7 @@ const FollowUps = () => {
       </div>
 
       {/* Global Search & Filters */}
-      <SearchFilter properties={allFollowUps} showAdvanced={true} />
+      <SearchFilter properties={allFollowUps} showAdvanced={true} pageKey="follow-ups" />
 
       {/* Toggle Row */}
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
