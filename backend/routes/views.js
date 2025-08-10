@@ -112,6 +112,20 @@ router.post('/:id/default', protect, async (req, res) => {
   }
 });
 
+// Clear default view for a page (set "None" as default)
+router.post('/default/clear', protect, async (req, res) => {
+  try {
+    const { pageKey } = req.body || {};
+    if (!pageKey) return res.status(400).json({ error: 'pageKey is required' });
+
+    await SavedView.updateMany({ owner: req.user._id, pageKey, isDefault: true }, { $set: { isDefault: false } });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error clearing default view:', error);
+    res.status(500).json({ error: 'Failed to clear default view' });
+  }
+});
+
 module.exports = router;
 
 

@@ -395,10 +395,16 @@ export const setDefaultView = async (id) => {
   return response.data;
 };
 
+export const clearDefaultView = async (pageKey) => {
+  const response = await client.post(`/views/default/clear`, { pageKey });
+  return response.data;
+};
+
 apiService.listViews = listViews;
 apiService.createView = createView;
 apiService.updateView = updateView;
 apiService.deleteView = deleteView;
 apiService.setDefaultView = setDefaultView;
+apiService.clearDefaultView = clearDefaultView;
 
 export default apiService; 

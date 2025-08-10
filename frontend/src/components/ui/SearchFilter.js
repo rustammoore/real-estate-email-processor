@@ -790,6 +790,14 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               <Button color="error" variant="text" size="small" onClick={() => handleDeleteView(selectedViewId)}>Delete</Button>
             </>
           )}
+          {!selectedViewId && (
+            <Button variant="text" size="small" onClick={async () => {
+              try {
+                await api.clearDefaultView(pageKey);
+                setViews(prev => prev.map(v => ({ ...v, isDefault: false })));
+              } catch (_) {}
+            }}>Set Default to None</Button>
+          )}
         </Box>
       )}
 
