@@ -13,22 +13,30 @@ function BackButton({
   const navigate = useNavigate();
 
   const handleClick = () => {
-    if (typeof onClick === 'function') {
-      onClick();
-      return;
-    }
+    // Always prefer navigating back in history when possible
     try {
-      if (window.history && window.history.length > 1) {
+      const hasHistory = typeof window !== 'undefined' && window.history && window.history.length > 1;
+      if (hasHistory) {
         navigate(-1);
-      } else if (to) {
-        navigate(to);
-      } else {
-        navigate('/');
+        return;
       }
     } catch (_) {
-      if (to) navigate(to);
-      else navigate('/');
+      // ignore and try fallbacks below
     }
+
+    // Fallback: use provided handler if any
+    if (typeof onClick === 'function') {
+      try {
+        onClick();
+        return;
+      } catch (_) {
+        // ignore and try final route fallback
+      }
+    }
+
+    // Final fallback: use provided route or home
+    if (to) navigate(to);
+    else navigate('/');
   };
 
   return (
