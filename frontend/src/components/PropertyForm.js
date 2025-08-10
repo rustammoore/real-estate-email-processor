@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, Typography, TextField, Button, Grid, Box, Alert, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { Card, CardContent, Typography, TextField, Button, Grid, Box, Alert, FormControl, InputLabel, Select, MenuItem, InputAdornment } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import PropertyPageLayout from './layout/PropertyPageLayout';
@@ -329,7 +329,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                       <Box sx={{ mb: 1 }} key={field.name}>
                         <TextField
                           fullWidth
-                          label={field.label}
+                          label={field.name === 'cap_rate' ? `${field.label} (%)` : field.label}
                           value={formData[field.name] ?? ''}
                           onChange={(e) => handleInputChange(field.name, e.target.value)}
                           onBlur={(e) => {
@@ -339,7 +339,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                               handleInputChange('price', formatted);
                             } else if (field.name === 'cap_rate') {
                               const raw = e.target.value || '';
-                              // Normalize cap rate input: allow either % or decimal, store as percentage string
+                              // Normalize cap rate input: allow either % or decimal, store as percentage string with '%'
                               const hasPercent = raw.includes('%');
                               const cleaned = raw.replace(/[^0-9.\-]/g, '');
                               const n = parseFloat(cleaned);
@@ -347,7 +347,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                                 handleInputChange('cap_rate', '');
                               } else {
                                 const percent = hasPercent ? n : (n <= 1 ? n * 100 : n);
-                                const formatted = `${percent}`;
+                                const formatted = `${percent}%`;
                                 handleInputChange('cap_rate', formatted);
                               }
                             }
@@ -356,6 +356,7 @@ function PropertyForm({ mode = 'create', propertyId = null, onSuccess = null }) 
                           margin="dense"
                           multiline={Boolean(field.ui?.multiline)}
                           rows={field.ui?.rows || (field.ui?.multiline ? 2 : undefined)}
+                          InputProps={field.name === 'cap_rate' ? { endAdornment: <InputAdornment position="end">%</InputAdornment> } : undefined}
                         />
                       </Box>
                     ))}
