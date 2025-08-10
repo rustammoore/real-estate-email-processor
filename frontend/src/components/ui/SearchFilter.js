@@ -762,7 +762,18 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               labelId="saved-views-label"
               label="Saved Views"
               value={selectedViewId}
-              onChange={(e) => handleApplyView(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSelectedViewId(value);
+                if (!value) {
+                  // Selecting None clears search and filters immediately
+                  setLocalSearchTerm('');
+                  setPendingFilters({});
+                  setHasPendingChanges(false);
+                  setSearchTerm('');
+                  clearAllFilters();
+                }
+              }}
               disabled={isLoadingViews}
             >
               <MenuItem value="">
@@ -784,6 +795,14 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
           <Button variant="outlined" size="small" onClick={handleSaveView}>
             Save View
           </Button>
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!selectedViewId}
+            onClick={() => selectedViewId && handleApplyView(selectedViewId)}
+          >
+            Apply View
+          </Button>
           {selectedViewId && (
             <>
               <Button variant="text" size="small" onClick={() => handleSetDefault(selectedViewId)}>Set Default</Button>
@@ -796,7 +815,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                 await api.clearDefaultView(pageKey);
                 setViews(prev => prev.map(v => ({ ...v, isDefault: false })));
               } catch (_) {}
-            }}>Set Default to None</Button>
+            }}>Reset Default</Button>
           )}
         </Box>
       )}
