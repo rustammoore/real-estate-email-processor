@@ -53,8 +53,8 @@ export const VALIDATION_SCHEMAS = {
     description: { required: true, minLength: 10, maxLength: 500 },
     price: { required: true, pattern: /^\d+(\.\d{1,2})?$/ },
     location: { required: true, minLength: 5 },
-    bedrooms: { required: true, min: 0, max: 20 },
-    bathrooms: { required: true, min: 0, max: 10 }
+    CustomFieldOne: { required: false, min: 0, max: 999999 },
+    CustomFieldTwo: { required: false, min: 0, max: 999999 }
   }
 };
 

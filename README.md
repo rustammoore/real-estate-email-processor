@@ -152,8 +152,7 @@ A comprehensive application that processes real estate listing emails from Gmail
 - `location` - Property location
 - `property_type` - Type of property
 - `square_feet` - Square footage
-- `bedrooms` - Number of bedrooms
-- `bathrooms` - Number of bathrooms
+// Fields renamed: use `CustomFieldOne` and `CustomFieldTwo` instead of `bedrooms` and `bathrooms`.
 - `images` - JSON array of image URLs
 - `property_url` - Original listing URL
 - `email_source` - Email sender

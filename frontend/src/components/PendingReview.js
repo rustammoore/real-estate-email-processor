@@ -21,7 +21,8 @@ import {
   CheckCircle as ApproveIcon,
   Cancel as RejectIcon,
   Compare as CompareIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Visibility as ViewIcon
 } from '@mui/icons-material';
 import PropertyGrid from './PropertyGrid';
 import PropertyCard from './PropertyCard';
@@ -238,6 +239,16 @@ function PendingReview() {
               sx={{ flex: 1, minWidth: 'fit-content' }}
             >
               Reject
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              startIcon={<ViewIcon />}
+              onClick={() => navigate(`/properties/${property.id}`)}
+              sx={{ flex: 1, minWidth: 'fit-content' }}
+            >
+              View
             </Button>
             <Button
               size="small"

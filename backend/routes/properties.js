@@ -33,8 +33,8 @@ router.post('/', protect, async (req, res) => {
       square_feet,
       acre,
       year_built,
-      bedrooms,
-      bathrooms,
+      CustomFieldOne,
+      CustomFieldTwo,
       images,
       property_url,
       for_lease_info,
@@ -70,8 +70,8 @@ router.post('/', protect, async (req, res) => {
       square_feet,
       acre,
       year_built,
-      bedrooms,
-      bathrooms,
+      CustomFieldOne,
+      CustomFieldTwo,
       images: Array.isArray(images) ? images : (images ? [images] : []),
       property_url,
       for_lease_info,
@@ -164,8 +164,15 @@ router.get('/', optionalAuth, async (req, res) => {
       const id = String(_id || rest.id);
       // Compute price per ft if possible
       let price_per_ft = null;
-      const priceNum = parseFloat(rest.price);
-      const sqftNum = parseFloat(rest.square_feet);
+      const normalizeNumber = (val) => {
+        if (typeof val === 'number') return Number.isFinite(val) ? val : NaN;
+        if (typeof val !== 'string') return NaN;
+        const cleaned = val.replace(/[^0-9.\-]/g, '');
+        const num = parseFloat(cleaned);
+        return Number.isFinite(num) ? num : NaN;
+      };
+      const priceNum = normalizeNumber(rest.price);
+      const sqftNum = normalizeNumber(rest.square_feet);
       if (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0) {
         price_per_ft = priceNum / sqftNum;
       }
@@ -192,7 +199,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid ID format' });
     }
-    const property = await Property.findById(id).select('-__v');
+    const property = await Property.findById(id).select('-__v').lean();
     
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
@@ -201,9 +208,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    const data = property.toObject();
+    const data = property;
     const priceNum = parseFloat(data.price);
-    const sqftNum = parseFloat(data.square_feet);
     let price_per_ft = null;
     if (Number.isFinite(priceNum) && Number.isFinite(sqftNum) && sqftNum > 0) {
       price_per_ft = priceNum / sqftNum;
@@ -252,7 +258,7 @@ router.put('/:id', protect, async (req, res) => {
     // Allow updates to both core fields and interaction/follow-up fields
     const allowedFields = [
       'title', 'description', 'price', 'location', 'property_type', 'sub_type',
-      'state', 'square_feet', 'acre', 'year_built', 'bedrooms', 'bathrooms', 'status', 'cap_rate',
+      'state', 'square_feet', 'acre', 'year_built', 'CustomFieldOne', 'CustomFieldTwo', 'status', 'cap_rate',
       'liked', 'loved', 'rating', 'archived', 'reviewed', 'deleted',
       'followUpDate', 'followUpSet', 'lastFollowUpDate',
       'for_lease_info', 'other', 'procured', 'property_url'
@@ -264,6 +270,8 @@ router.put('/:id', protect, async (req, res) => {
         update[field] = req.body[field];
       }
     }
+    // No legacy mapping
+
     // Maintain address_hash when location changes
     if (Object.prototype.hasOwnProperty.call(update, 'location')) {
       const nextLocation = update.location;

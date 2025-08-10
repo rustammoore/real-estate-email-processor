@@ -262,6 +262,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               value={currentValue}
               label={field.label}
               onChange={(e) => handleFilterChange(field.name, e.target.value)}
+              sx={field.name === 'property_type' ? { '& .MuiSelect-select': { py: 0.5 } } : undefined}
               MenuProps={{
                 PaperProps: {
                   sx: { '& .MuiMenuItem-root': { minHeight: 28, py: 0.25, fontSize: '0.8rem' } }
@@ -348,12 +349,18 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     if (field.type === 'special' || field.type === 'object' || field.name === 'id' || field.name === '_id') {
       return acc;
     }
+
+    // Do not hide bedrooms/bathrooms; backend now aliases them as CustomFieldOne/Two
     
-    const group = field.type === 'text' ? 'Text Fields' :
-                  field.type === 'numeric' ? 'Numeric Fields' :
-                  field.type === 'boolean' ? 'Boolean Fields' :
-                  field.type === 'enum' ? 'Status Fields' :
-                  field.type === 'date' ? 'Date Fields' : 'Other';
+    // Force some fields into Text Fields group to meet UX requirements
+    const forceTextGroup = new Set(['property_type', 'email_source', 'email_subject', 'user', 'procured', 'address_hash']);
+    const group = forceTextGroup.has(field.name)
+      ? 'Text Fields'
+      : field.type === 'text' ? 'Text Fields'
+      : field.type === 'numeric' ? 'Numeric Fields'
+      : field.type === 'boolean' ? 'Boolean Fields'
+      : field.type === 'enum' ? 'Status Fields'
+      : field.type === 'date' ? 'Date Fields' : 'Other';
     
     if (!acc[group]) acc[group] = [];
     acc[group].push(field);
@@ -627,13 +634,51 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                     <Typography variant="caption">{groupName}</Typography>
                   </AccordionSummary>
                   <AccordionDetails sx={{ pt: 0.5 }}>
-                    <Grid container spacing={1}>
-                      {fields.map(field => (
-                        <Grid item xs={12} sm={6} md={4} key={field.name}>
-                          {renderFilterControl(field)}
-                        </Grid>
-                      ))}
-                    </Grid>
+                    {groupName === 'Text Fields' ? (
+                      <>
+                        {(() => {
+                          const metaTextNames = ['email_source', 'email_subject', 'user', 'procured', 'address_hash'];
+                          const primaryFields = fields.filter(f => !metaTextNames.includes(f.name));
+                          const metaFields = fields.filter(f => metaTextNames.includes(f.name));
+                          return (
+                            <>
+                              {primaryFields.length > 0 && (
+                                <>
+                                  <Typography variant="overline" sx={{ display: 'block', mb: 0.5 }}>General</Typography>
+                                  <Grid container spacing={1} sx={{ mb: metaFields.length > 0 ? 1 : 0 }}>
+                                    {primaryFields.map((field) => (
+                                      <Grid item xs={12} sm={6} md={4} key={field.name}>
+                                        {renderFilterControl(field)}
+                                      </Grid>
+                                    ))}
+                                  </Grid>
+                                </>
+                              )}
+                              {metaFields.length > 0 && (
+                                <>
+                                  <Typography variant="overline" sx={{ display: 'block', mb: 0.5 }}>Email & Meta</Typography>
+                                  <Grid container spacing={1}>
+                                    {metaFields.map((field) => (
+                                      <Grid item xs={12} sm={6} md={4} key={field.name}>
+                                        {renderFilterControl(field)}
+                                      </Grid>
+                                    ))}
+                                  </Grid>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <Grid container spacing={1}>
+                        {fields.map(field => (
+                          <Grid item xs={12} sm={6} md={4} key={field.name}>
+                            {renderFilterControl(field)}
+                          </Grid>
+                        ))}
+                      </Grid>
+                    )}
                   </AccordionDetails>
                 </Accordion>
               </Grid>

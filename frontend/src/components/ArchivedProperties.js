@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -11,6 +12,7 @@ import {
 import {
   Unarchive as UnarchiveIcon
 } from '@mui/icons-material';
+import { EyeIcon } from '@heroicons/react/24/outline';
 import BackButton from './ui/BackButton';
 import PropertyGrid from './PropertyGrid';
 import SearchFilter from './ui/SearchFilter';
@@ -19,6 +21,7 @@ import { useSearch } from '../contexts/SearchContext';
 import { toggleArchive, updateProperty, deleteProperty as deletePropertyApi } from '../services/api';
 
 function ArchivedProperties() {
+  const navigate = useNavigate();
   const [message, setMessage] = useState('');
   const { archivedProperties, loading, fetchArchivedProperties } = useArchivedProperties();
   const { filterProperties } = useSearch();
@@ -164,21 +167,30 @@ function ArchivedProperties() {
         selectedIds={selectedIds}
         onToggleSelect={toggleSelectOne}
         customActions={(property) => (
-          <Tooltip title="Unarchive">
-            <IconButton
-              size="small"
-              onClick={() => handleUnarchive(property.id)}
-              sx={{ 
-                color: 'success.main',
-                '&:hover': { 
-                  backgroundColor: 'success.light',
-                  color: 'success.dark'
-                }
-              }}
+          <Box display="flex" gap={0.5}>
+            <button
+              onClick={() => navigate(`/properties/${property.id}`)}
+              title="View Details"
+              className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-md flex items-center justify-center transition-colors"
             >
-              <UnarchiveIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+              <EyeIcon className="w-4 h-4" />
+            </button>
+            <Tooltip title="Unarchive">
+              <IconButton
+                size="small"
+                onClick={() => handleUnarchive(property.id)}
+                sx={{ 
+                  color: 'success.main',
+                  '&:hover': { 
+                    backgroundColor: 'success.light',
+                    color: 'success.dark'
+                  }
+                }}
+              >
+                <UnarchiveIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
         )}
         variant="outlined"
         compact={false}

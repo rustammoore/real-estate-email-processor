@@ -160,7 +160,7 @@ export const PROPERTY_FIELDS = [
   {
     name: 'CustomFieldOne',
     label: 'CustomFieldOne',
-    type: 'numeric',
+    type: 'text',
     defaultValue: '',
     section: PROPERTY_SECTIONS.DETAILS,
     showIn: { create: true, edit: true, view: true, search: true },
@@ -169,7 +169,7 @@ export const PROPERTY_FIELDS = [
   {
     name: 'CustomFieldTwo',
     label: 'CustomFieldTwo',
-    type: 'numeric',
+    type: 'text',
     defaultValue: '',
     section: PROPERTY_SECTIONS.DETAILS,
     showIn: { create: true, edit: true, view: true, search: true },

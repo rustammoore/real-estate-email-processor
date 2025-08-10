@@ -56,11 +56,11 @@ const propertySchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  bedrooms: {
+  CustomFieldOne: {
     type: String,
     trim: true
   },
-  bathrooms: {
+  CustomFieldTwo: {
     type: String,
     trim: true
   },
@@ -163,9 +163,21 @@ propertySchema.virtual('id').get(function() {
   return this._id;
 });
 
-// Ensure virtual fields are serialized
+// Ensure virtual fields are serialized for both toJSON and toObject, and hide legacy fields
 propertySchema.set('toJSON', {
   virtuals: true,
+  getters: true,
+  transform: function(doc, ret) {
+    ret.id = ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
+
+propertySchema.set('toObject', {
+  virtuals: true,
+  getters: true,
   transform: function(doc, ret) {
     ret.id = ret._id;
     delete ret._id;

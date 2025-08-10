@@ -63,8 +63,10 @@ export const SearchProvider = ({ children }) => {
     if (!properties || properties.length === 0) return;
 
     const newFields = new Set();
+    const disallowed = new Set(['bedrooms', 'bathrooms']);
     properties.forEach(property => {
       Object.keys(property).forEach(key => {
+        if (disallowed.has(key)) return; // ignore legacy fields
         if (property[key] !== undefined && property[key] !== null) {
           newFields.add(key);
         }
@@ -89,6 +91,7 @@ export const SearchProvider = ({ children }) => {
 
   // Get field type based on centralized schema and value inference
   const getFieldType = useCallback((fieldName, value) => {
+    // No legacy overrides needed; using CustomFieldOne/CustomFieldTwo instead
     // Prefer schema mapping
     const schemaField = PROPERTY_FIELDS_MAP[fieldName];
     if (schemaField?.type) return schemaField.type;
@@ -317,7 +320,7 @@ export const SearchProvider = ({ children }) => {
     return Array.from(allFields).map(field => ({
       name: field,
       type: getFieldType(field),
-      label: field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      label: (PROPERTY_FIELDS_MAP[field]?.label) || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
       options: (PROPERTY_FIELDS_MAP[field]?.options) || SCHEMA_METADATA.enum[field] || null
     }));
   }, [searchState.dynamicFields, getFieldType]);

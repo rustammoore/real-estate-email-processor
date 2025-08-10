@@ -17,6 +17,7 @@ import {
   DeleteForever as DeleteForeverIcon,
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
+import { EyeIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import BackButton from './ui/BackButton';
 import PropertyGrid from './PropertyGrid';
@@ -188,7 +189,14 @@ function DeletedProperties() {
   };
 
   const customActions = (property) => (
-    <Box sx={{ display: 'flex', gap: 0.5, width: '100%' }}>
+    <Box sx={{ display: 'flex', gap: 0.5, width: '100%', alignItems: 'center' }}>
+      <button
+        onClick={() => navigate(`/properties/${property.id}`)}
+        title="View Details"
+        className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-md flex items-center justify-center transition-colors"
+      >
+        <EyeIcon className="w-4 h-4" />
+      </button>
       <Tooltip title="Restore Property">
         <IconButton
           size="small"
