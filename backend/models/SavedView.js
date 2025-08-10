@@ -42,12 +42,6 @@ const savedViewSchema = new mongoose.Schema(
       enum: ['asc', 'desc'],
       default: 'desc',
     },
-    visibility: {
-      type: String,
-      enum: ['private', 'public'],
-      default: 'private',
-      index: true,
-    },
     isDefault: {
       type: Boolean,
       default: false,

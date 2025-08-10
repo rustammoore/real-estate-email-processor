@@ -61,7 +61,6 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   const [isLoadingViews, setIsLoadingViews] = useState(false);
   const [selectedViewId, setSelectedViewId] = useState('');
   const [newViewName, setNewViewName] = useState('');
-  const [newViewVisibility, setNewViewVisibility] = useState('private');
 
   // Update dynamic fields when properties change
   useEffect(() => {
@@ -141,13 +140,11 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
       filters: pendingFilters,
       sortBy: pendingSortBy,
       sortOrder: pendingSortOrder,
-      visibility: newViewVisibility,
     };
     try {
       const created = await api.createView(payload);
       setViews(prev => [created, ...prev]);
       setNewViewName('');
-      setNewViewVisibility('private');
       setSelectedViewId(created.id);
     } catch (_) {
       // ignore
@@ -773,7 +770,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
               </MenuItem>
               {views.map((v) => (
                 <MenuItem key={v.id} value={v.id}>
-                  {v.name}{v.visibility === 'public' ? ' (public)' : ''}{v.isDefault ? ' • default' : ''}
+                  {v.name}{v.isDefault ? ' • default' : ''}
                 </MenuItem>
               ))}
             </Select>
@@ -784,18 +781,6 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             value={newViewName}
             onChange={(e) => setNewViewName(e.target.value)}
           />
-          <FormControl size="small">
-            <InputLabel id="view-visibility-label">Visibility</InputLabel>
-            <Select
-              labelId="view-visibility-label"
-              label="Visibility"
-              value={newViewVisibility}
-              onChange={(e) => setNewViewVisibility(e.target.value)}
-            >
-              <MenuItem value="private">Private</MenuItem>
-              <MenuItem value="public">Public</MenuItem>
-            </Select>
-          </FormControl>
           <Button variant="outlined" size="small" onClick={handleSaveView}>
             Save View
           </Button>
