@@ -30,6 +30,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useSearch } from '../../contexts/SearchContext';
 import { debounce } from '../../utils';
+import { PROPERTY_FIELDS } from '../../constants/propertySchema';
 
 function SearchFilter({ properties = [], variant = 'default', showAdvanced = true }) {
   const {
@@ -159,7 +160,16 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
       case 'numeric':
         // Collect numeric values across properties for dynamic bounds
         const numericValues = properties
-          .map(p => parseFloat(p[field.name]))
+          .map(p => {
+            const raw = p[field.name];
+            if (typeof raw === 'number') return raw;
+            if (typeof raw === 'string') {
+              const cleaned = raw.replace(/[^0-9.\-]/g, '');
+              const n = parseFloat(cleaned);
+              return Number.isFinite(n) ? n : NaN;
+            }
+            return NaN;
+          })
           .filter(v => Number.isFinite(v));
 
         let computedMin;
@@ -193,7 +203,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
                 size="small"
                 value={[clampedMin, clampedMax]}
                 onChange={(e, newValue) => {
-                  const [newMin, newMax] = newValue;
+                  const [newMin, newMax] = Array.isArray(newValue) ? newValue : [computedMin, computedMax];
                   handleFilterChange(field.name, { min: newMin, max: newMax });
                 }}
                 valueLabelDisplay="auto"
@@ -287,8 +297,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
   };
 
   // Identify quick compact fields
-  const quickBooleanNames = ['liked', 'loved', 'archived', 'deleted', 'followUp'];
+  // Order: Reviewed first, then Liked, Loved, Archived, Deleted
+  const quickBooleanNames = ['reviewed', 'liked', 'loved', 'archived', 'deleted'];
   const quickBooleanFields = availableFields.filter(f => f.type === 'boolean' && quickBooleanNames.includes(f.name));
+  // Enforce the desired order using schema names above
+  const quickBooleanFieldsOrdered = quickBooleanNames
+    .map((name) => quickBooleanFields.find((f) => f.name === name))
+    .filter(Boolean);
   const statusField = availableFields.find(f => f.name === 'status');
   // Inject synthetic boolean for follow-ups: treat as has followUpDate
   const hasFollowUpField = { name: 'followUp', type: 'boolean', label: 'Follow-ups' };
@@ -298,6 +313,13 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     statusField?.name,
     includeFollowUpSynthetic ? hasFollowUpField.name : undefined
   ].filter(Boolean));
+
+  // Build schema order index to align with edit page ordering
+  const schemaOrderIndex = React.useMemo(() => {
+    const index = new Map();
+    PROPERTY_FIELDS.forEach((f, i) => index.set(f.name, i));
+    return index;
+  }, []);
 
   // Group remaining fields by type for better organization
   const groupedFields = availableFields.reduce((acc, field) => {
@@ -318,6 +340,17 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
     acc[group].push(field);
     return acc;
   }, {});
+
+  // Sort fields within each group to follow schema order (similar to edit page)
+  Object.keys(groupedFields).forEach((groupName) => {
+    groupedFields[groupName].sort((a, b) => {
+      const ai = schemaOrderIndex.get(a.name);
+      const bi = schemaOrderIndex.get(b.name);
+      const av = ai === undefined ? Number.MAX_SAFE_INTEGER : ai;
+      const bv = bi === undefined ? Number.MAX_SAFE_INTEGER : bi;
+      return av - bv;
+    });
+  });
 
   const activeFiltersCount = Object.keys(searchState.filters).length;
 
@@ -499,7 +532,7 @@ function SearchFilter({ properties = [], variant = 'default', showAdvanced = tru
             {((quickBooleanFields.length > 0) || statusField || includeFollowUpSynthetic) && (
               <Grid item xs={12}>
                 <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                  {quickBooleanFields.map((field) => (
+                  {quickBooleanFieldsOrdered.map((field) => (
                     <FormControlLabel
                       key={field.name}
                       control={
